@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"io"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
@@ -111,6 +112,20 @@ const (
 	FieldCritKeys     = "keys"     // list def designates it as a key, only keys
 	FieldCritEditable = "editable" // noedit is missing
 )
+
+func (f crudField) GormTags() string {
+	tags := []string{
+		"column:" + f.Col(),
+	}
+	if f.IsKey() {
+		tags = append(tags, "primaryKey")
+	}
+	custom := getExtention(f.Def, "serializer", "")
+	if custom != "" {
+		tags = append(tags, "serializer:"+custom)
+	}
+	return strings.Join(tags, ";")
+}
 
 func (v crudItem) Fields(crit ...string) []crudField {
 	var out []crudField

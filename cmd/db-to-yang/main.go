@@ -17,6 +17,7 @@ var mssqlArg = flag.String("mssql", "", "DB connection string for SQL Server")
 var mysqlArg = flag.String("mysql", "", "DB connection string for MySQL")
 
 var tbl = flag.String("table", "", "Table name to generate YANG for.")
+var colsArg = flag.Bool("cols", false, "Add column annotations.")
 
 func main() {
 	flag.Parse()
@@ -81,16 +82,19 @@ func WriteYang(data tableData, out *os.File) error {
 		"camel": strcase.LowerCamelCase,
 	})
 	tmpl, err = tmpl.Parse(`
-		container {{.Name | camel }} {
-			description "Auto-generated from table {{.Name}}";
+	list {{.Name | camel }} {
+		description "Auto-generated from table {{.Name}}";
 
-			{{range .Columns}}
-			leaf {{.Name | camel }} {
-				type {{.YangType}};
-				{{if .IsNullable}}x:nullable;{{end}}        
-			}
-			{{end}}
+		{{range .Columns}}
+		leaf {{.Name | camel }} {
+			type {{.YangType}};
+			{{- if .IsNullable }}
+			x:nullable;{{ end }}
+			{{- if $.ShowCols }}
+			x:col "{{.Name}}";{{ end }}
 		}
+		{{end}}
+	}
 `)
 	if err != nil {
 		return err
@@ -100,7 +104,8 @@ func WriteYang(data tableData, out *os.File) error {
 
 func ReadDb(db DbReader, table string) (tableData, error) {
 	data := tableData{
-		Name: table,
+		Name:     table,
+		ShowCols: *colsArg,
 	}
 	rows, err := db.Rows(table)
 	if err != nil {
@@ -129,8 +134,9 @@ func (c *column) IsNullable() bool {
 }
 
 type tableData struct {
-	Name    string
-	Columns []column
+	Name     string
+	Columns  []column
+	ShowCols bool
 }
 
 func (c column) YangType() string {

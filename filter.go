@@ -1,5 +1,10 @@
 package ncservice
 
+import (
+	"reflect"
+	"slices"
+)
+
 type ValueFilter func(Value) bool
 
 func FilterAll(param Value) bool {
@@ -21,28 +26,45 @@ func FilterAnd(f ...ValueFilter) ValueFilter {
 	}
 }
 
-func FilterOnlyKeys(x HasBasicCrudSupport) ValueFilter {
+func FilterOnlyKeys(x any) ValueFilter {
 	return filterKeys(x, true)
 }
 
-func FilterNoKeys(x HasBasicCrudSupport) ValueFilter {
+func FilterNoKeys(x any) ValueFilter {
 	return filterKeys(x, false)
 }
 
-func filterKeys(x HasBasicCrudSupport, isKey bool) ValueFilter {
-	keys := x.CrudInfo().Keys
+func filterKeys(x any, isKey bool) ValueFilter {
+	ref := reflect.ValueOf(x)
+	if ref.Kind() == reflect.Ptr {
+		ref = ref.Elem()
+	}
+	t := ref.Type()
+	n := ref.NumField()
+	var keys []string
+	for i := range n {
+		fld := t.Field(i)
+		tag := fld.Tag.Get("gorm")
+		_, exists := getGormTag(tag, "primaryKey")
+		if !exists {
+			continue
+		}
+		col, exists := getGormTag(tag, "column")
+		if !exists {
+			continue
+		}
+		keys = append(keys, col)
+	}
 	return func(p Value) bool {
-		for _, k := range keys {
-			if k == p.Col {
-				return isKey
-			}
+		if slices.Contains(keys, p.Col) {
+			return isKey
 		}
 		return !isKey
 	}
 }
 
 func AppendFiltered(args []Value, p Value, f ValueFilter) []Value {
-	if f(p) {
+	if f == nil || f(p) {
 		return append(args, p)
 	}
 	return args
