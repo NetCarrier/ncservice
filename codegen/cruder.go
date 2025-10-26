@@ -19,6 +19,8 @@ import (
 type Cruder struct {
 	opts      CrudOptions
 	enumTypes map[string]Enum
+	items     []crudItem
+	rootDef   *meta.Module
 }
 
 func NewCruder(opts CrudOptions) *Cruder {
@@ -53,15 +55,27 @@ func (c *Cruder) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	entries, err := c.read(m)
-	if err != nil {
+	if err = c.read(m); err != nil {
 		return err
 	}
-	return c.write(out, entries)
+	return c.write(out, c.items)
 }
 
-func (c *Cruder) read(m *meta.Module) ([]crudItem, error) {
-	var entries []crudItem
+// TargetField finds the field definition for the given path. Useful for
+// leafRefs that point to another definition.
+func (c *Cruder) resolveFieldPath(target meta.Leafable) crudField {
+	for _, i := range c.items {
+		for _, f := range i.fields {
+			if f.Def == target {
+				return f
+			}
+		}
+	}
+	panic(fmt.Sprintf("crud item not found: %s", target))
+}
+
+func (c *Cruder) read(m *meta.Module) error {
+	c.rootDef = m
 	for _, e := range c.opts.Entries {
 		entry := crudItem{
 			Parent: c,
@@ -69,7 +83,7 @@ func (c *Cruder) read(m *meta.Module) ([]crudItem, error) {
 		var valid bool
 		entry.Def, valid = meta.Find(m, e.Ydef).(*meta.List)
 		if !valid {
-			return nil, fmt.Errorf("invalid YANG definition: %s", e.Ydef)
+			return fmt.Errorf("invalid YANG definition: %s", e.Ydef)
 		}
 		for _, f := range entry.Def.DataDefinitions() {
 			f := crudField{
@@ -79,9 +93,9 @@ func (c *Cruder) read(m *meta.Module) ([]crudItem, error) {
 			entry.fields = append(entry.fields, f)
 		}
 
-		entries = append(entries, entry)
+		c.items = append(c.items, entry)
 	}
-	return entries, nil
+	return nil
 }
 
 func (c *Cruder) write(out io.Writer, entries []crudItem) error {
@@ -244,11 +258,12 @@ func (f crudField) GoTypePtr() string {
 }
 
 func (f crudField) GoRawType() string {
-	if f.Def.Type().Format() == val.FmtEnum {
+	t := f.Def.Type().Resolve()
+	if t.Format() == val.FmtEnum {
 		return f.getEnumType()
 	}
 
-	typeIdent := f.Def.Type().Ident()
+	typeIdent := t.Ident()
 	switch typeIdent {
 	case "int32":
 		return "int"
@@ -258,6 +273,15 @@ func (f crudField) GoRawType() string {
 		return "bool"
 	}
 	return typeIdent
+}
+
+func (f crudField) ForeignKeyTag() string {
+	if path := f.Def.Type().Path(); path != "" {
+		targetDef := meta.Find(f.Def, path).(meta.Leafable)
+		targetField := f.Parent.Parent.resolveFieldPath(targetDef)
+		return fmt.Sprintf(`fk:"%s.%s"`, targetField.Parent.Table(), targetField.Col())
+	}
+	return "" // not a foreign key
 }
 
 func (v crudItem) Table() string {

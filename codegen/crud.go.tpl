@@ -12,7 +12,7 @@ import (
 // {{ .Def.Description}}
 type {{ .Struct }} struct {
 {{- range .Fields }}    
-    {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}"` // {{ .Def.Description }}
+    {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}" {{ .ForeignKeyTag }} ` // {{ .Def.Description }}
 {{- end }}
 }
 

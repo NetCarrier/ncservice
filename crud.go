@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 type Value struct {
@@ -63,6 +66,59 @@ func forEachGorm(h any, fn func(fld reflect.StructField, tag string) bool) {
 			break
 		}
 	}
+}
+
+func forEachTag(h any, tagId string, fn func(f reflect.StructField, v reflect.Value, tag string) bool) {
+	ref := reflect.ValueOf(h)
+	if ref.Kind() == reflect.Ptr {
+		ref = ref.Elem()
+	}
+	t := ref.Type()
+	for i := 0; i < ref.NumField(); i++ {
+		fld := t.Field(i)
+		t := fld.Tag.Get(tagId)
+		if t == "" {
+			continue
+		}
+		v := ref.FieldByName(fld.Name)
+		if !fn(fld, v, t) {
+			break
+		}
+	}
+}
+
+func ResolveForeignKeys(db *gorm.DB, x schema.Tabler) error {
+	var err error
+	forEachTag(x, "fk", func(fld reflect.StructField, raw reflect.Value, tag string) bool {
+		v := raw
+		// handle pointers to foreign keys as optional FKs: if they exist, they must be valid
+		if raw.Kind() == reflect.Ptr {
+			if raw.IsNil() {
+				return true
+			}
+			v = raw.Elem()
+		}
+		parts := strings.Split(tag, ".")
+		if len(parts) != 2 {
+			panic("invalid fk tag format " + tag)
+		}
+		targetTable := parts[0]
+		targetCol := parts[1]
+		var exists bool
+		id := v.Interface()
+		sql := fmt.Sprintf("select exists(select 1 from %s where %s = ?)", targetTable, targetCol)
+		err = db.Raw(sql, id).Scan(&exists).Error
+		if err != nil {
+			err = fmt.Errorf("erorr checking foreign key. %w", err)
+			return false
+		}
+		if !exists {
+			err = fmt.Errorf("foreign key constraint failed: %s.%s=%v does not exist", targetTable, targetCol, id)
+			return false
+		}
+		return true
+	})
+	return err
 }
 
 func getGormTag(tag string, target string) (string, bool) {
