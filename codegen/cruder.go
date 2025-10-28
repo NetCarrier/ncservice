@@ -141,6 +141,16 @@ func (f crudField) GormTags() string {
 	return strings.Join(tags, ";")
 }
 
+func (f crudField) BindingTags(typ string) string {
+	tags := []string{}
+	if f.IsNullable() || typ == "update" {
+		tags = append(tags, "optional")
+	} else {
+		tags = append(tags, "required")
+	}
+	return strings.Join(tags, ";")
+}
+
 func (v crudItem) Fields(crit ...string) []crudField {
 	var out []crudField
 	for _, f := range v.fields {

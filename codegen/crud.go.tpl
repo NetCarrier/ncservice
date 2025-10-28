@@ -66,7 +66,7 @@ func (x *{{ .Struct }}) SetOwner(userId string) {
 // {{ .Def.Description}}
 type {{ .Struct }}Create struct {
 {{- range .Fields "editable"}}
-    {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}"` // {{ .Def.Description }}
+    {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}" binding:"{{ .BindingTags "create" }}"` // {{ .Def.Description }}
 {{- end }}
 }
 
@@ -74,7 +74,7 @@ type {{ .Struct }}Create struct {
 // {{ .Def.Description}}
 type {{ .Struct }}Update struct {
 {{- range .Fields "editable"}}
-    {{ .Name }} {{ .GoTypePtr }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}"` // {{ .Def.Description }}
+    {{ .Name }} {{ .GoTypePtr }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}" binding:"{{ .BindingTags "update" }}"` // {{ .Def.Description }}
 {{- end }}
 }
 
@@ -103,6 +103,9 @@ func (e *{{ $ename }}) Scan(value any) error {
 func (e {{ $ename }}) Value() (driver.Value, error) { 
     if e == "" {
         return nil, nil
+    }
+    if !e.IsValid() {
+        return nil, fmt.Errorf("provided value for field {{ $ename }} is invalid")
     }
 	return []uint8(e), nil
 }
