@@ -1,6 +1,6 @@
 module github.com/NetCarrier/ncservice
 
-go 1.24.2
+go 1.24.3
 
 require (
 	github.com/Masterminds/sprig v2.22.0+incompatible

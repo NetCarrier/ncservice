@@ -126,3 +126,5 @@ func (e {{ $ename }}) IsValid() bool {
 
 // ignore, avoids unused time import error
 var _ = time.Time{}
+var _ driver.Value
+var _ fmt.Stringer
