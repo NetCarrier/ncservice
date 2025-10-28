@@ -259,20 +259,27 @@ func (f crudField) GoTypePtr() string {
 
 func (f crudField) GoRawType() string {
 	t := f.Def.Type().Resolve()
+	var goType string
 	if t.Format() == val.FmtEnum {
-		return f.getEnumType()
+		goType = f.getEnumType()
+	} else {
+		typeIdent := t.Ident()
+		switch typeIdent {
+		case "int32":
+			goType = "int"
+		case "dateTime":
+			goType = "time.Time"
+		case "boolean":
+			goType = "bool"
+		default:
+			goType = typeIdent
+		}
 	}
 
-	typeIdent := t.Ident()
-	switch typeIdent {
-	case "int32":
-		return "int"
-	case "dateTime":
-		return "time.Time"
-	case "boolean":
-		return "bool"
+	if _, ok := f.Def.(*meta.LeafList); ok {
+		goType = "[]" + goType
 	}
-	return typeIdent
+	return goType
 }
 
 func (f crudField) ForeignKeyTag() string {
