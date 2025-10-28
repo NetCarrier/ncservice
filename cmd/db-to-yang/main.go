@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"text/template"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -69,9 +70,11 @@ type MySql struct {
 func (d *MySql) Rows(table string) (*sqlx.Rows, error) {
 	sqlstr := fmt.Sprintf(`select 
 		COLUMN_NAME as Name, 
-		DATA_TYPE as DataType,
-		IS_NULLABLE as RawIsNullable
-		from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
+    	DATA_TYPE as DataType, 
+    	IS_NULLABLE as RawIsNullable, 
+    	COLUMN_TYPE as ColumnType,
+    	COLUMN_DEFAULT as DefaultValue
+    	from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
 	return d.pool.Queryx(sqlstr)
 }
 
@@ -80,6 +83,23 @@ func WriteYang(data tableData, out *os.File) error {
 	tmpl := template.New("yang")
 	tmpl.Funcs(template.FuncMap{
 		"camel": strcase.LowerCamelCase,
+
+		// supports nil and notnil as of now
+		"is": func(typ string, val any) bool {
+			if val == nil {
+				return typ == "nil"
+			}
+			rv := reflect.ValueOf(val)
+			if typ == "nil" {
+				return rv.IsNil()
+			}
+			if typ == "notnil" {
+				return !rv.IsNil()
+			}
+
+			// Unsupported type returns false by default
+			return false
+		},
 	})
 	tmpl, err = tmpl.Parse(`
 	list {{.Name | camel }} {
@@ -88,7 +108,7 @@ func WriteYang(data tableData, out *os.File) error {
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
 			type {{.YangType}};
-			{{- if .IsNullable }}
+			{{- if or .IsNullable (is "nil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
 			x:col "{{.Name}}";{{ end }}
@@ -124,9 +144,11 @@ func ReadDb(db DbReader, table string) (tableData, error) {
 }
 
 type column struct {
-	Name          string `db:"Name"`
-	DataType      string `db:"DataType"`
-	RawIsNullable string `db:"RawIsNullable"`
+	Name          string  `db:"Name"`
+	DataType      string  `db:"DataType"`
+	RawIsNullable string  `db:"RawIsNullable"`
+	ColumnType    string  `db:"ColumnType"`
+	DefaultValue  *[]byte `db:"DefaultValue"`
 }
 
 func (c *column) IsNullable() bool {
