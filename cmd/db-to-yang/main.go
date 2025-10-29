@@ -73,7 +73,8 @@ func (d *MySql) Rows(table string) (*sqlx.Rows, error) {
     	DATA_TYPE as DataType, 
     	IS_NULLABLE as RawIsNullable, 
     	COLUMN_TYPE as ColumnType,
-    	COLUMN_DEFAULT as DefaultValue
+    	COLUMN_DEFAULT as DefaultValue,
+		COLUMN_COMMENT as Descriprion
     	from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
 	return d.pool.Queryx(sqlstr)
 }
@@ -90,11 +91,13 @@ func WriteYang(data tableData, out *os.File) error {
 				return typ == "nil"
 			}
 			rv := reflect.ValueOf(val)
-			if typ == "nil" {
-				return rv.IsNil()
+			// Pull actual value out from pointer
+			for rv.Kind() == reflect.Pointer {
+				rv = rv.Elem()
 			}
-			if typ == "notnil" {
-				return !rv.IsNil()
+
+			if rv.Kind() == reflect.String {
+				return (typ == "nil" && rv.String() == "") || (typ == "notnil" && rv.String() != "")
 			}
 
 			// Unsupported type returns false by default
@@ -108,6 +111,8 @@ func WriteYang(data tableData, out *os.File) error {
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
 			type {{.YangType}};
+			{{- if is "notnil" .Descriprion }}
+			description "{{ .Descriprion }}";{{ end }}
 			{{- if or .IsNullable (is "nil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
@@ -149,6 +154,7 @@ type column struct {
 	RawIsNullable string  `db:"RawIsNullable"`
 	ColumnType    string  `db:"ColumnType"`
 	DefaultValue  *[]byte `db:"DefaultValue"`
+	Descriprion   *string `db:"Descriprion"`
 }
 
 func (c *column) IsNullable() bool {
