@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 	"github.com/NetCarrier/ncservice"
+	"github.com/NetCarrier/telapia/utils"
 	"github.com/freeconf/yang/meta"
 	"github.com/freeconf/yang/parser"
 	"github.com/freeconf/yang/source"
@@ -138,6 +139,9 @@ func (f crudField) GormTags() string {
 	if custom != "" {
 		tags = append(tags, "serializer:"+custom)
 	}
+	if f.DefaultValue() != nil {
+		tags = append(tags, "default:"+*f.DefaultValue())
+	}
 	return strings.Join(tags, ";")
 }
 
@@ -253,13 +257,16 @@ func (f crudField) getEnumType() string {
 	return e.Name
 }
 
-func (f crudField) Description() string {
+func (f crudField) DefaultValue() *string {
 	for _, ext := range f.Def.Extensions() {
-		if ext.Keyword() == "description" {
-			return ext.Argument()
+		if ext.Ident() == "default" {
+			if f.GoType() == "string" || f.GoType() == "*string" {
+				return utils.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
+			}
+			return utils.Ptr(ext.Argument())
 		}
 	}
-	return ""
+	return nil
 }
 
 func (f crudField) GoTypePtr() string {
