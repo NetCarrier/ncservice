@@ -253,6 +253,15 @@ func (f crudField) getEnumType() string {
 	return e.Name
 }
 
+func (f crudField) Description() string {
+	for _, ext := range f.Def.Extensions() {
+		if ext.Keyword() == "description" {
+			return ext.Argument()
+		}
+	}
+	return ""
+}
+
 func (f crudField) GoTypePtr() string {
 	return "*" + f.GoRawType()
 }
