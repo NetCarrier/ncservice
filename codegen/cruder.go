@@ -143,12 +143,28 @@ func (f crudField) GormTags() string {
 
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	if f.IsNullable() || typ == "update" {
-		tags = append(tags, "optional")
-	} else {
-		tags = append(tags, "required")
+	// TODO: Currently assuming all optional to test other type of validations.
+	// will be fixed once binding validations tags will be implemented and tested properly
+	tags = append(tags, "omitempty")
+	// if f.IsNullable() || typ == "update" {
+	// 	tags = append(tags, "omitempty")
+	// } else {
+	// 	tags = append(tags, "required")
+	// }
+	if f.isEnum() {
+		// Add oneof tag for validation
+		values := []string{}
+		for _, val := range f.getEnumValues() {
+			if val.Parent.GoType() == "string" {
+				values = append(values, fmt.Sprintf("'%s'", val.Def.Ident()))
+			} else {
+				values = append(values, fmt.Sprintf("%d", val.Def.Value()))
+			}
+		}
+		oneofValues := strings.Join(values, " ")
+		tags = append(tags, fmt.Sprintf("oneof=%v", oneofValues))
 	}
-	return strings.Join(tags, ";")
+	return strings.Join(tags, ",")
 }
 
 func (v crudItem) Fields(crit ...string) []crudField {
@@ -246,6 +262,14 @@ func (f crudField) GoType() string {
 		t = "*" + t
 	}
 	return t
+}
+
+func (f crudField) isEnum() bool {
+	return f.Parent.Parent.enumTypes[f.GoRawType()].Name != ""
+}
+
+func (f crudField) getEnumValues() []EnumValue {
+	return f.Parent.Parent.enumTypes[f.GoRawType()].Values()
 }
 
 func (f crudField) getEnumType() string {
