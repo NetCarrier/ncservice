@@ -87,21 +87,21 @@ func WriteYang(data tableData, out *os.File) error {
 
 		// supports nil and notnil as of now
 		"is": func(typ string, val any) bool {
-			if val == nil {
+			rv := reflect.ValueOf(val)
+			if rv.Kind() == reflect.Pointer && rv.IsNil() {
 				return typ == "nil"
 			}
-			rv := reflect.ValueOf(val)
 			// Pull actual value out from pointer
 			for rv.Kind() == reflect.Pointer {
 				rv = rv.Elem()
 			}
 
-			if rv.Kind() == reflect.String {
+			switch rv.Kind() {
+			case reflect.String:
 				return (typ == "nil" && rv.String() == "") || (typ == "notnil" && rv.String() != "")
+			default:
+				return typ == "nil"
 			}
-
-			// Unsupported type returns false by default
-			return false
 		},
 	})
 	tmpl, err = tmpl.Parse(`
@@ -116,6 +116,8 @@ func WriteYang(data tableData, out *os.File) error {
 			{{- if or .IsNullable (is "nil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
+			{{- if is "notnil" .DefaultValue }}
+			x:default {{ .DefaultValue }};{{ end }}
 			x:col "{{.Name}}";{{ end }}
 		}
 		{{end}}
@@ -149,12 +151,12 @@ func ReadDb(db DbReader, table string) (tableData, error) {
 }
 
 type column struct {
-	Name          string  `db:"Name"`
-	DataType      string  `db:"DataType"`
-	RawIsNullable string  `db:"RawIsNullable"`
-	ColumnType    string  `db:"ColumnType"`
-	DefaultValue  *[]byte `db:"DefaultValue"`
-	Descriprion   *string `db:"Descriprion"`
+	Name            string  `db:"Name"`
+	DataType        string  `db:"DataType"`
+	RawIsNullable   string  `db:"RawIsNullable"`
+	ColumnType      string  `db:"ColumnType"`
+	DefaultValueRaw *string `db:"DefaultValue"`
+	Descriprion     *string `db:"Descriprion"`
 }
 
 func (c *column) IsNullable() bool {
@@ -184,6 +186,18 @@ func (c column) YangType() string {
 		ytype = "string"
 	}
 	return ytype
+}
+
+func (c *column) DefaultValue() string {
+	if c.DefaultValueRaw == nil {
+		return ""
+	}
+	switch c.YangType() {
+	case "string", "dateTime":
+		return fmt.Sprintf("\"%s\"", *c.DefaultValueRaw)
+	default:
+		return *c.DefaultValueRaw
+	}
 }
 
 func chkerr(err error) {
