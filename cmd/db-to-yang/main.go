@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"text/template"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -69,9 +70,12 @@ type MySql struct {
 func (d *MySql) Rows(table string) (*sqlx.Rows, error) {
 	sqlstr := fmt.Sprintf(`select 
 		COLUMN_NAME as Name, 
-		DATA_TYPE as DataType,
-		IS_NULLABLE as RawIsNullable
-		from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
+    	DATA_TYPE as DataType, 
+    	IS_NULLABLE as RawIsNullable, 
+    	COLUMN_TYPE as ColumnType,
+    	COLUMN_DEFAULT as DefaultValue,
+		COLUMN_COMMENT as Description
+    	from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
 	return d.pool.Queryx(sqlstr)
 }
 
@@ -80,6 +84,25 @@ func WriteYang(data tableData, out *os.File) error {
 	tmpl := template.New("yang")
 	tmpl.Funcs(template.FuncMap{
 		"camel": strcase.LowerCamelCase,
+
+		// supports nil and notnil as of now
+		"is": func(typ string, val any) bool {
+			rv := reflect.ValueOf(val)
+			if rv.Kind() == reflect.Pointer && rv.IsNil() {
+				return typ == "nil"
+			}
+			// Pull actual value out from pointer
+			for rv.Kind() == reflect.Pointer {
+				rv = rv.Elem()
+			}
+
+			switch rv.Kind() {
+			case reflect.String:
+				return (typ == "nil" && rv.String() == "") || (typ == "notnil" && rv.String() != "")
+			default:
+				return typ == "nil"
+			}
+		},
 	})
 	tmpl, err = tmpl.Parse(`
 	list {{.Name | camel }} {
@@ -88,9 +111,13 @@ func WriteYang(data tableData, out *os.File) error {
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
 			type {{.YangType}};
-			{{- if .IsNullable }}
+			{{- if is "notnil" .Description }}
+			description "{{ .Description }}";{{ end }}
+			{{- if or .IsNullable (is "notnil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
+			{{- if is "notnil" .DefaultValue }}
+			x:default {{ .DefaultValue }};{{ end }}
 			x:col "{{.Name}}";{{ end }}
 		}
 		{{end}}
@@ -124,9 +151,12 @@ func ReadDb(db DbReader, table string) (tableData, error) {
 }
 
 type column struct {
-	Name          string `db:"Name"`
-	DataType      string `db:"DataType"`
-	RawIsNullable string `db:"RawIsNullable"`
+	Name            string  `db:"Name"`
+	DataType        string  `db:"DataType"`
+	RawIsNullable   string  `db:"RawIsNullable"`
+	ColumnType      string  `db:"ColumnType"`
+	DefaultValueRaw *string `db:"DefaultValue"`
+	Description     *string `db:"Description"`
 }
 
 func (c *column) IsNullable() bool {
@@ -156,6 +186,18 @@ func (c column) YangType() string {
 		ytype = "string"
 	}
 	return ytype
+}
+
+func (c *column) DefaultValue() string {
+	if c.DefaultValueRaw == nil {
+		return ""
+	}
+	switch c.YangType() {
+	case "string", "dateTime":
+		return fmt.Sprintf("\"%s\"", *c.DefaultValueRaw)
+	default:
+		return *c.DefaultValueRaw
+	}
 }
 
 func chkerr(err error) {

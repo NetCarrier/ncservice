@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/sprig"
 	"github.com/NetCarrier/ncservice"
+	"github.com/NetCarrier/telapia/utils"
 	"github.com/freeconf/yang/meta"
 	"github.com/freeconf/yang/parser"
 	"github.com/freeconf/yang/source"
@@ -138,7 +139,33 @@ func (f crudField) GormTags() string {
 	if custom != "" {
 		tags = append(tags, "serializer:"+custom)
 	}
+	if f.DefaultValue() != nil {
+		tags = append(tags, "default:"+*f.DefaultValue())
+	}
 	return strings.Join(tags, ";")
+}
+
+func (f crudField) BindingTags(typ string) string {
+	tags := []string{}
+	if f.IsNullable() || typ == "update" {
+		tags = append(tags, "omitempty")
+	} else {
+		tags = append(tags, "required")
+	}
+	if f.isEnum() {
+		// Add oneof tag for validation
+		values := []string{}
+		for _, val := range f.getEnumValues() {
+			if val.Parent.GoType() == "string" {
+				values = append(values, fmt.Sprintf("'%s'", val.Def.Ident()))
+			} else {
+				values = append(values, fmt.Sprintf("%d", val.Def.Value()))
+			}
+		}
+		oneofValues := strings.Join(values, " ")
+		tags = append(tags, fmt.Sprintf("oneof=%v", oneofValues))
+	}
+	return strings.Join(tags, ",")
 }
 
 func (v crudItem) Fields(crit ...string) []crudField {
@@ -238,6 +265,14 @@ func (f crudField) GoType() string {
 	return t
 }
 
+func (f crudField) isEnum() bool {
+	return f.Parent.Parent.enumTypes[f.GoRawType()].Name != ""
+}
+
+func (f crudField) getEnumValues() []EnumValue {
+	return f.Parent.Parent.enumTypes[f.GoRawType()].Values()
+}
+
 func (f crudField) getEnumType() string {
 	e := Enum{
 		Def: f.Def.Type(),
@@ -251,6 +286,18 @@ func (f crudField) getEnumType() string {
 	}
 	f.Parent.Parent.enumTypes[e.Name] = e
 	return e.Name
+}
+
+func (f crudField) DefaultValue() *string {
+	for _, ext := range f.Def.Extensions() {
+		if ext.Ident() == "default" {
+			if f.GoType() == "string" || f.GoType() == "*string" {
+				return utils.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
+			}
+			return utils.Ptr(ext.Argument())
+		}
+	}
+	return nil
 }
 
 func (f crudField) GoTypePtr() string {
