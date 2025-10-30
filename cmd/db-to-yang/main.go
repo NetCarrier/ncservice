@@ -74,7 +74,7 @@ func (d *MySql) Rows(table string) (*sqlx.Rows, error) {
     	IS_NULLABLE as RawIsNullable, 
     	COLUMN_TYPE as ColumnType,
     	COLUMN_DEFAULT as DefaultValue,
-		COLUMN_COMMENT as Descriprion
+		COLUMN_COMMENT as Description
     	from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
 	return d.pool.Queryx(sqlstr)
 }
@@ -111,8 +111,8 @@ func WriteYang(data tableData, out *os.File) error {
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
 			type {{.YangType}};
-			{{- if is "notnil" .Descriprion }}
-			description "{{ .Descriprion }}";{{ end }}
+			{{- if is "notnil" .Description }}
+			description "{{ .Description }}";{{ end }}
 			{{- if or .IsNullable (is "nil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
@@ -156,7 +156,7 @@ type column struct {
 	RawIsNullable   string  `db:"RawIsNullable"`
 	ColumnType      string  `db:"ColumnType"`
 	DefaultValueRaw *string `db:"DefaultValue"`
-	Descriprion     *string `db:"Descriprion"`
+	Description     *string `db:"Description"`
 }
 
 func (c *column) IsNullable() bool {
