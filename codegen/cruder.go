@@ -147,14 +147,11 @@ func (f crudField) GormTags() string {
 
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	// TODO: Currently assuming all optional to test other type of validations.
-	// will be fixed once binding validations tags will be implemented and tested properly
-	tags = append(tags, "omitempty")
-	// if f.IsNullable() || typ == "update" {
-	// 	tags = append(tags, "omitempty")
-	// } else {
-	// 	tags = append(tags, "required")
-	// }
+	if f.IsNullable() || typ == "update" {
+		tags = append(tags, "omitempty")
+	} else {
+		tags = append(tags, "required")
+	}
 	if f.isEnum() {
 		// Add oneof tag for validation
 		values := []string{}

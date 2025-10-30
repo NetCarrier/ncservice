@@ -91,11 +91,14 @@ const (
 
 // implements sql.Scanner
 func (e *{{ $ename }}) Scan(value any) error {
-	s, ok := value.([]uint8)
-	if !ok {
-		return fmt.Errorf("unable to scan %T into {{ $ename }}", value)
-	}
-	*e = {{ $ename }}(s)
+    switch v := value.(type) {
+    case string:
+        *e = {{ $ename }}(v)
+    case []uint8:
+        *e = {{ $ename }}(string(v))
+    default:
+        return fmt.Errorf("unable to scan %T into {{ $ename }}", value)
+    }
 	return nil
 }
 

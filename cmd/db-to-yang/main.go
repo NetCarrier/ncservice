@@ -113,7 +113,7 @@ func WriteYang(data tableData, out *os.File) error {
 			type {{.YangType}};
 			{{- if is "notnil" .Description }}
 			description "{{ .Description }}";{{ end }}
-			{{- if or .IsNullable (is "nil" .DefaultValue) }}
+			{{- if or .IsNullable (is "notnil" .DefaultValue) }}
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
 			{{- if is "notnil" .DefaultValue }}
