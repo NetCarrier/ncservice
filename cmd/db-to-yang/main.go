@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strings"
 	"text/template"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -114,7 +115,14 @@ func WriteYang(data tableData, out *os.File) error {
 		key {{ .PrimaryKey }};{{ end }}
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
+			{{- if .IsEnum }}
+			type enumeration {
+				{{- range .EnumValues }}
+				enum {{ . }};{{ end }}
+			}
+			{{- else }}
 			type {{.YangType}};
+			{{- end }}
 			{{- if is "notnil" .Description }}
 			description "{{ .Description }}";{{ end }}
 			{{- if or .IsNullable (is "notnil" .DefaultValue) }}
@@ -183,8 +191,14 @@ func (c column) YangType() string {
 		ytype = "boolean"
 	case "varchar", "nvarchar", "text", "ntext", "char", "nchar":
 		ytype = "string"
-	case "datetime", "datetime2", "smalldatetime", "date", "time":
+	case "datetime", "datetime2", "smalldatetime", "date":
 		ytype = "dateTime"
+	case "time":
+		if mysqlArg != nil {
+			ytype = "string"
+		} else {
+			ytype = "dateTime"
+		}
 	case "float", "real", "decimal", "numeric", "money", "smallmoney":
 		ytype = "decimal64"
 	default:
@@ -215,6 +229,35 @@ func (t tableData) PrimaryKey() string {
 		}
 	}
 	return ""
+}
+
+func (c *column) IsEnum() bool {
+	return c.DataType == "enum"
+}
+
+func (c *column) EnumValues() []string {
+	if c.DataType != "enum" {
+		return nil
+	}
+	var vals []string
+	// COLUMN_TYPE is like: enum('value1','value2','value3')
+	ct := c.ColumnType
+	if len(ct) < 6 {
+		return vals
+	}
+	ct = ct[5 : len(ct)-1] // strip "enum(" and ")"
+	vals = append(vals, splitEnumValues(ct)...)
+	return vals
+}
+
+func splitEnumValues(ct string) []string {
+	var vals []string
+	for part := range strings.SplitSeq(ct, ",") {
+		if len(part) >= 2 && part[0] == '\'' && part[len(part)-1] == '\'' {
+			vals = append(vals, part[1:len(part)-1])
+		}
+	}
+	return vals
 }
 
 func chkerr(err error) {

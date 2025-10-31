@@ -8,6 +8,30 @@ import (
     "database/sql/driver"
 )
 
+type MySQLTime time.Time
+
+func (t *MySQLTime) Scan(value interface{}) error {
+    if value == nil {
+        *t = MySQLTime(time.Time{})
+        return nil
+    }
+    switch v := value.(type) {
+    case []uint8:
+        parsed, err := time.Parse("15:04:05", string(v))
+        if err != nil {
+            return err
+        }
+        *t = MySQLTime(parsed)
+        return nil
+    default:
+        return fmt.Errorf("unsupported type %T", v)
+    }
+}
+
+func (t MySQLTime) Value() (driver.Value, error) {
+    return time.Time(t).Format("15:04:05"), nil
+}
+
 {{- range .Cruds }}
 // {{ .Def.Description}}
 type {{ .Struct }} struct {

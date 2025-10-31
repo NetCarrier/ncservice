@@ -291,7 +291,7 @@ func (f crudField) getEnumType() string {
 func (f crudField) DefaultValue() *string {
 	for _, ext := range f.Def.Extensions() {
 		if ext.Ident() == "default" {
-			if f.GoType() == "string" || f.GoType() == "*string" {
+			if f.GoRawType() == "string" || f.GoRawType() == "*string" || f.GoRawType() == "time.Time" || f.GoRawType() == "*time.Time" {
 				return utils.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
 			}
 			return utils.Ptr(ext.Argument())
@@ -316,6 +316,8 @@ func (f crudField) GoRawType() string {
 			goType = "int"
 		case "dateTime":
 			goType = "time.Time"
+		case "mysql-time":
+			goType = "MySQLTime"
 		case "boolean":
 			goType = "bool"
 		default:
