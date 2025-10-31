@@ -147,7 +147,7 @@ func (f crudField) GormTags() string {
 
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	if f.IsNullable() || typ == "update" || hasExtention(f.Def, "autofill") {
+	if f.IsNullable() || (typ == "update" && !f.IsRequiredForEdit()) || f.GoRawType() == "bool" || hasExtention(f.Def, "autofill") {
 		tags = append(tags, "omitempty")
 	} else {
 		tags = append(tags, "required")
@@ -261,6 +261,14 @@ func (f crudField) IsNullable() bool {
 	return hasExtention(f.Def, "nullable")
 }
 
+func (f crudField) IsRequiredForEdit() bool {
+	return meta.FindExtension("editrequired", f.Def.Extensions()) != nil
+}
+
+func (f crudField) IsHidden() bool {
+	return meta.FindExtension("hidden", f.Def.Extensions()) != nil
+}
+
 func (f crudField) GoType() string {
 	t := f.GoRawType()
 	if f.IsNullable() {
@@ -295,7 +303,7 @@ func (f crudField) getEnumType() string {
 func (f crudField) DefaultValue() *string {
 	for _, ext := range f.Def.Extensions() {
 		if ext.Ident() == "default" {
-			if f.GoType() == "string" || f.GoType() == "*string" {
+			if f.GoRawType() == "string" || f.GoRawType() == "time.Time" {
 				return utils.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
 			}
 			return utils.Ptr(ext.Argument())
