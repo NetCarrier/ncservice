@@ -74,7 +74,8 @@ func (d *MySql) Rows(table string) (*sqlx.Rows, error) {
     	IS_NULLABLE as RawIsNullable, 
     	COLUMN_TYPE as ColumnType,
     	COLUMN_DEFAULT as DefaultValue,
-		COLUMN_COMMENT as Description
+		COLUMN_COMMENT as Description,
+		COLUMN_KEY as ColumnKey
     	from INFORMATION_SCHEMA.COLUMNS where TABLE_NAME = '%s'`, table)
 	return d.pool.Queryx(sqlstr)
 }
@@ -107,7 +108,10 @@ func WriteYang(data tableData, out *os.File) error {
 	tmpl, err = tmpl.Parse(`
 	list {{.Name | camel }} {
 		description "Auto-generated from table {{.Name}}";
-
+		
+		x:table "{{.Name}}";
+		{{- if is "notnil" .PrimaryKey }}
+		key {{ .PrimaryKey }};{{ end }}
 		{{range .Columns}}
 		leaf {{.Name | camel }} {
 			type {{.YangType}};
@@ -157,6 +161,7 @@ type column struct {
 	ColumnType      string  `db:"ColumnType"`
 	DefaultValueRaw *string `db:"DefaultValue"`
 	Description     *string `db:"Description"`
+	ColumnKey       *string `db:"ColumnKey"`
 }
 
 func (c *column) IsNullable() bool {
@@ -198,6 +203,18 @@ func (c *column) DefaultValue() string {
 	default:
 		return *c.DefaultValueRaw
 	}
+}
+
+func (t tableData) PrimaryKey() string {
+	if len(t.Columns) == 0 {
+		return ""
+	}
+	for _, col := range t.Columns {
+		if col.ColumnKey != nil && *col.ColumnKey == "PRI" {
+			return strcase.LowerCamelCase(col.Name)
+		}
+	}
+	return ""
 }
 
 func chkerr(err error) {
