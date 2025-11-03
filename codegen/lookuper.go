@@ -3,7 +3,7 @@ package codegen
 import (
 	"fmt"
 	"io"
-	"path/filepath"
+	"regexp"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
@@ -25,8 +25,7 @@ func NewLookuper(db *sqlx.DB, opts LookupOptions) *Lookuper {
 }
 
 type LookupOptions struct {
-	Template string
-	Lookups  []LookupEntryOptions
+	Lookups []LookupEntryOptions
 }
 
 type lookup struct {
@@ -74,9 +73,13 @@ func (le lookupEntry) Id() lookupFieldValue {
 	panic("id field not found")
 }
 
+var nonAlphaRegx = regexp.MustCompile("[^a-zA-Z0-9]+")
+
 func (le lookupEntry) GoLabel() string {
 	n := le.parent.Name
-	s := strcase.UpperCamelCase(fmt.Sprintf("%v", le.Label().Value))
+	raw := fmt.Sprintf("%v", le.Label().Value)
+	clean := nonAlphaRegx.ReplaceAllString(raw, "")
+	s := strcase.UpperCamelCase(clean)
 	if le.parent.Options.Overrides != nil {
 		id := fmt.Sprintf("%v", le.Id().Value)
 		if ov, ok := le.parent.Options.Overrides[id]; ok {
@@ -191,8 +194,12 @@ func (l *Lookuper) read() ([]lookup, error) {
 func (l *Lookuper) write(out io.Writer, entries []lookup) error {
 	funcs := sprig.FuncMap()
 	funcs["toLowerCamel"] = strcase.LowerCamelCase
-	tmpl := template.New(filepath.Base(l.opts.Template))
-	t, err := tmpl.Funcs(funcs).ParseFiles(l.opts.Template)
+
+	tmpl, err := internal.ReadFile("lookup.go.tpl")
+	if err != nil {
+		return err
+	}
+	t, err := template.New("main").Funcs(funcs).Parse(string(tmpl))
 	if err != nil {
 		return err
 	}

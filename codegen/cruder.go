@@ -147,7 +147,7 @@ func (f crudField) GormTags() string {
 
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	if f.IsNullable() || typ == "update" {
+	if f.IsNullable() || typ == "update" || hasExtention(f.Def, "autofill") {
 		tags = append(tags, "omitempty")
 	} else {
 		tags = append(tags, "required")
@@ -249,12 +249,16 @@ func getExtention(def meta.Definition, extName string, defaultValue string) stri
 	return defaultValue
 }
 
+func hasExtention(def meta.Definition, extName string) bool {
+	return meta.FindExtension(extName, def.Extensions()) != nil
+}
+
 func (f crudField) IsEditable() bool {
-	return meta.FindExtension("noedit", f.Def.Extensions()) == nil
+	return !hasExtention(f.Def, "noedit")
 }
 
 func (f crudField) IsNullable() bool {
-	return meta.FindExtension("nullable", f.Def.Extensions()) != nil
+	return hasExtention(f.Def, "nullable")
 }
 
 func (f crudField) GoType() string {
