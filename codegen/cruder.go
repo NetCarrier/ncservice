@@ -3,12 +3,12 @@ package codegen
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig"
 	"github.com/NetCarrier/ncservice"
-	"github.com/NetCarrier/telapia/utils"
 	"github.com/freeconf/yang/meta"
 	"github.com/freeconf/yang/parser"
 	"github.com/freeconf/yang/source"
@@ -32,6 +32,7 @@ func NewCruder(opts CrudOptions) *Cruder {
 }
 
 type CrudOptions struct {
+	Template   string
 	Package    string
 	YangPath   string
 	YangModule string
@@ -103,7 +104,7 @@ func (c *Cruder) write(out io.Writer, entries []crudItem) error {
 	funcs := sprig.FuncMap()
 	funcs["toLowerCamel"] = strcase.LowerCamelCase
 
-	tmpl, err := internal.ReadFile("crud.go.tpl")
+	tmpl, err := os.ReadFile(c.opts.Template)
 	if err != nil {
 		return err
 	}
@@ -296,9 +297,9 @@ func (f crudField) DefaultValue() *string {
 	for _, ext := range f.Def.Extensions() {
 		if ext.Ident() == "default" {
 			if f.GoType() == "string" || f.GoType() == "*string" {
-				return utils.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
+				return ncservice.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
 			}
-			return utils.Ptr(ext.Argument())
+			return ncservice.Ptr(ext.Argument())
 		}
 	}
 	return nil
