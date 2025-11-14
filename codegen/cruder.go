@@ -302,15 +302,19 @@ func (f crudField) getEnumType() string {
 }
 
 func (f crudField) DefaultValue() *string {
-	for _, ext := range f.Def.Extensions() {
-		if ext.Ident() == "default" {
-			if f.GoRawType() == "string" || f.GoRawType() == "time.Time" {
-				return ncservice.Ptr(fmt.Sprintf("'%s'", ext.Argument()))
-			}
-			return ncservice.Ptr(ext.Argument())
+	def := f.Def.DefaultValue()
+	switch val := def.(type) {
+	case string:
+		if val == "" {
+			return nil
 		}
+		if f.GoRawType() == "string" || f.GoRawType() == "time.Time" {
+			return ncservice.Ptr(fmt.Sprintf("'%v'", val))
+		}
+		return ncservice.Ptr(val)
+	default:
+		return nil
 	}
-	return nil
 }
 
 func (f crudField) GoTypePtr() string {
