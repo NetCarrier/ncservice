@@ -146,9 +146,28 @@ func (f crudField) GormTags() string {
 	return strings.Join(tags, ";")
 }
 
+func (f crudField) JsonSchemaTag() string {
+	desc := f.Def.(meta.Describable).Description()
+	if desc != "" {
+		return fmt.Sprintf(`jsonschema:"%s"`, desc)
+	}
+	return ""
+}
+
+func (f crudField) JsonBindings(typ string) string {
+	if f.OmitEmpty(typ) {
+		return ",omitempty"
+	}
+	return ""
+}
+
+func (f crudField) OmitEmpty(typ string) bool {
+	return f.IsNullable() || (typ == "update" && !f.IsRequiredForEdit()) || f.GoRawType() == "bool" || hasExtention(f.Def, "autofill")
+}
+
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	if f.IsNullable() || (typ == "update" && !f.IsRequiredForEdit()) || f.GoRawType() == "bool" || hasExtention(f.Def, "autofill") {
+	if f.OmitEmpty(typ) {
 		tags = append(tags, "omitempty")
 	} else {
 		tags = append(tags, "required")

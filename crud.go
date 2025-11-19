@@ -14,8 +14,27 @@ type Value struct {
 	Val any
 }
 
+func JsonValues(h any, f ValueFilter) []Value {
+	return values(h, f, jsonColMapper)
+}
+
 // Read all fields in a given struct ready for DB i/o
 func Values(h any, f ValueFilter) []Value {
+	return values(h, f, dbColMapper)
+}
+
+func dbColMapper(fld reflect.StructField) (string, bool) {
+	return getGormTag(fld.Tag.Get("gorm"), "column")
+}
+
+func jsonColMapper(fld reflect.StructField) (string, bool) {
+	name := fld.Tag.Get("json")
+	return name, name != "" && name != "-"
+}
+
+type colMapper func(fld reflect.StructField) (string, bool)
+
+func values(h any, f ValueFilter, getCol colMapper) []Value {
 	ref := reflect.ValueOf(h)
 	if ref.Kind() == reflect.Ptr {
 		ref = ref.Elem()
@@ -25,7 +44,7 @@ func Values(h any, f ValueFilter) []Value {
 	var values []Value
 	for i := range n {
 		fld := t.Field(i)
-		col, exists := getGormTag(fld.Tag.Get("gorm"), "column")
+		col, exists := getCol(fld)
 		if !exists {
 			continue
 		}
