@@ -313,6 +313,9 @@ func (f crudField) DefaultValue() *string {
 			return ncservice.Ptr(fmt.Sprintf("'%v'", val))
 		}
 		return ncservice.Ptr(val)
+	case []string:
+		// TODO: Impliment default value logic
+		return nil
 	default:
 		log.Fatalf("unsupported type: %v", val)
 	}
