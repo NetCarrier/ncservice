@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 	"text/template"
@@ -313,8 +314,9 @@ func (f crudField) DefaultValue() *string {
 		}
 		return ncservice.Ptr(val)
 	default:
-		return nil
+		log.Fatalf("unsupported type: %v", val)
 	}
+	return nil
 }
 
 func (f crudField) GoTypePtr() string {
