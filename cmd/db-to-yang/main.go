@@ -129,7 +129,7 @@ func WriteYang(data tableData, out *os.File) error {
 			x:nullable;{{ end }}
 			{{- if $.ShowCols }}
 			{{- if is "notnil" .DefaultValue }}
-			x:default {{ .DefaultValue }};{{ end }}
+			default {{ .DefaultValue }};{{ end }}
 			x:col "{{.Name}}";{{ end }}
 		}
 		{{end}}
