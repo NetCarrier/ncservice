@@ -5,20 +5,20 @@ import (
 	"slices"
 )
 
-type ValueFilter func(Value) bool
+type ValueFilter func(Value, reflect.StructField) bool
 
-func FilterAll(param Value) bool {
+func FilterAll(param Value, fld reflect.StructField) bool {
 	return true
 }
 
-func FilterNotNil(param Value) bool {
+func FilterNotNil(param Value, fld reflect.StructField) bool {
 	return param.Val != nil
 }
 
 func FilterAnd(f ...ValueFilter) ValueFilter {
-	return func(p Value) bool {
+	return func(p Value, fld reflect.StructField) bool {
 		for _, f1 := range f {
-			if !f1(p) {
+			if !f1(p, fld) {
 				return false
 			}
 		}
@@ -55,7 +55,7 @@ func filterKeys(x any, isKey bool) ValueFilter {
 		}
 		keys = append(keys, col)
 	}
-	return func(p Value) bool {
+	return func(p Value, fld reflect.StructField) bool {
 		if slices.Contains(keys, p.Col) {
 			return isKey
 		}
@@ -63,8 +63,8 @@ func filterKeys(x any, isKey bool) ValueFilter {
 	}
 }
 
-func AppendFiltered(args []Value, p Value, f ValueFilter) []Value {
-	if f == nil || f(p) {
+func AppendFiltered(args []Value, p Value, fld reflect.StructField, f ValueFilter) []Value {
+	if f == nil || f(p, fld) {
 		return append(args, p)
 	}
 	return args
