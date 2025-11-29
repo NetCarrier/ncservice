@@ -29,7 +29,11 @@ func dbColMapper(fld reflect.StructField) (string, bool) {
 
 func jsonColMapper(fld reflect.StructField) (string, bool) {
 	name := fld.Tag.Get("json")
-	return name, name != "" && name != "-"
+	if name == "" || name == "-" {
+		return "", false
+	}
+	segs := strings.Split(name, ",")
+	return segs[0], true
 }
 
 type colMapper func(fld reflect.StructField) (string, bool)
@@ -55,7 +59,7 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 		if !(refval.Kind() == reflect.Ptr && refval.IsNil()) {
 			v.Val = refval.Interface()
 		}
-		values = AppendFiltered(values, v, f)
+		values = AppendFiltered(values, v, fld, f)
 	}
 	return values
 }

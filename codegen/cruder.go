@@ -150,7 +150,15 @@ func (f crudField) GormTags() string {
 func (f crudField) JsonSchemaTag() string {
 	desc := f.Def.(meta.Describable).Description()
 	if desc != "" {
-		return fmt.Sprintf(`jsonschema:"%s"`, desc)
+		return fmt.Sprintf(` jsonschema:"%s"`, desc)
+	}
+	return ""
+}
+
+func (f crudField) GroupsTag() string {
+	groups := getExtention(f.Def, "groups", "")
+	if groups != "" {
+		return fmt.Sprintf(` groups:"%s"`, groups)
 	}
 	return ""
 }
@@ -374,7 +382,7 @@ func (f crudField) ForeignKeyTag() string {
 	if path := f.Def.Type().Path(); path != "" {
 		targetDef := meta.Find(f.Def, path).(meta.Leafable)
 		targetField := f.Parent.Parent.resolveFieldPath(targetDef)
-		return fmt.Sprintf(`fk:"%s.%s"`, targetField.Parent.Table(), targetField.Col())
+		return fmt.Sprintf(` fk:"%s.%s"`, targetField.Parent.Table(), targetField.Col())
 	}
 	return "" // not a foreign key
 }

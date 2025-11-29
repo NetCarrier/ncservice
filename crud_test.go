@@ -1,6 +1,7 @@
 package ncservice
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +69,7 @@ func TestValues(t *testing.T) {
 		FavColor: &red,
 	}
 
-	values := Values(ts, func(v Value) bool {
+	values := Values(ts, func(v Value, _ reflect.StructField) bool {
 		return v.Col != "age" // Filter out age
 	})
 
