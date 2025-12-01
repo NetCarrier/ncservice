@@ -18,20 +18,19 @@ const GROUP_DEFAULT = "default" // When in field list, this special group it is 
 const GROUP_ALL = "all"         // When in target list, all field groups are included
 
 // MarshalJsonList marshals struct to JSON including only fields tagged with specified groups
-// useful for limitting output in APIs
+// useful for limiting output in APIs
 func MarshalJsonList[T any](x []T, groups ...string) ([]byte, error) {
 	return json.Marshal(x, json.WithMarshalers(
 		json.MarshalFunc(filterJsonByGroups[T](groups)),
 	))
 }
 
-// MarshalJSON marshals struct to JSON excluding fields tagged with specified groups
-// useful for limitting output in APIs
+// MarshalJSON marshals struct to JSON including fields tagged with specified groups
+// useful for limiting output in APIs
 func MarshalJSON[T any](x T, groups ...string) ([]byte, error) {
-	vals := JsonValues(x, func(v Value, fld reflect.StructField) bool {
-		return v.Col != "c"
-	})
-	return json.Marshal(marshalValues(vals))
+	return json.Marshal(x, json.WithMarshalers(
+		json.MarshalFunc(filterJsonByGroups[T](groups)),
+	))
 }
 
 func filterJsonByGroups[T any](target []string) func(T) ([]byte, error) {
