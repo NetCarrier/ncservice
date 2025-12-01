@@ -137,7 +137,7 @@ func (f crudField) GormTags() string {
 	if f.IsKey() {
 		tags = append(tags, "primaryKey")
 	}
-	custom := getExtention(f.Def, "serializer", "")
+	custom := getExtension(f.Def, "serializer", "")
 	if custom != "" {
 		tags = append(tags, "serializer:"+custom)
 	}
@@ -156,7 +156,7 @@ func (f crudField) JsonSchemaTag() string {
 }
 
 func (f crudField) GroupsTag() string {
-	groups := getExtention(f.Def, "groups", "")
+	groups := getExtension(f.Def, "groups", "")
 	if groups != "" {
 		return fmt.Sprintf(` groups:"%s"`, groups)
 	}
@@ -267,10 +267,10 @@ func (f crudField) Col() string {
 		col = strcase.UpperCamelCase(f.Def.Ident())
 	}
 
-	return getExtention(f.Def, "col", col)
+	return getExtension(f.Def, "col", col)
 }
 
-func getExtention(def meta.Definition, extName string, defaultValue string) string {
+func getExtension(def meta.Definition, extName string, defaultValue string) string {
 	x := meta.FindExtension(extName, def.Extensions())
 	if x != nil {
 		return x.Argument()
@@ -388,11 +388,11 @@ func (f crudField) ForeignKeyTag() string {
 }
 
 func (v crudItem) Table() string {
-	return getExtention(v.Def, "table", strcase.UpperCamelCase(v.Def.Ident()))
+	return getExtension(v.Def, "table", strcase.UpperCamelCase(v.Def.Ident()))
 }
 
 func (v crudItem) Struct() string {
-	return getExtention(v.Def, "struct", strcase.UpperCamelCase(v.Def.Ident()))
+	return getExtension(v.Def, "struct", strcase.UpperCamelCase(v.Def.Ident()))
 }
 
 type Enum struct {

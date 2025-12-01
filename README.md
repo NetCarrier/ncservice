@@ -9,7 +9,7 @@ go get github.com/NetCarrier/ncservice
 
 ## Requirements
 
-Uses Go 1.25's experimental JSON V2 API soyou need to set this environment variable to compile this.
+Uses Go 1.25's experimental JSON V2 API so you need to set this environment variable to compile this.
 
 ```
 GOEXPERIMENT=jsonv2

@@ -1,7 +1,6 @@
 package ncservice
 
 import (
-	"encoding/json/v2"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,9 +69,7 @@ func TestJsonFiltering(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		actual, err := json.Marshal(&x, json.WithMarshalers(
-			json.MarshalFunc(filterJsonByGroups[X](test.target)),
-		))
+		actual, err := MarshalJSON(&x, test.target...)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected, string(actual))
 	}
