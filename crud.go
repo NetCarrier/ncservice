@@ -224,11 +224,11 @@ func SqlSelectColumns[T any](prefix string, target []string) string {
 		groupsStr := fld.Tag.Get("groups")
 		if groupsStr != "" {
 			groups := strings.Split(groupsStr, ",")
-			for _, t := range target {
-				if t == GROUP_ALL {
+			for _, targetGroup := range target {
+				if targetGroup == GROUP_ALL {
 					goto selection
 				}
-				if slices.Contains(groups, t) {
+				if slices.Contains(groups, targetGroup) {
 					goto selection
 				}
 			}
