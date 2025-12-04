@@ -51,6 +51,115 @@ func TestGormTag(t *testing.T) {
 	}
 }
 
+func TestFieldToColumn(t *testing.T) {
+	// Test struct mimicking Extension struct's tag structure
+	type testStruct struct {
+		EmId             int     `json:"emId" gorm:"column:em_id;primaryKey"`
+		Name             string  `json:"name" gorm:"column:em_name"`
+		Number           int     `json:"number" gorm:"column:em_number"`
+		CallForwarding   bool    `json:"callForwarding" gorm:"column:em_call_forwarding"`
+		Email            *string `json:"email" gorm:"column:em_email"`
+		TenantId         int     `json:"tenantId" gorm:"column:tm_id"`
+		Status           string  `json:"status" gorm:"column:em_status"`
+		LastName         *string `json:"lastName" gorm:"column:em_last_name"`
+		VoicemailService bool    `json:"voicemailService" gorm:"column:em_voicemail_service"`
+	}
+
+	tests := []struct {
+		name        string
+		jsonField   string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "primary key field",
+			jsonField:   "emId",
+			expected:    "em_id",
+			expectError: false,
+		},
+		{
+			name:        "string field",
+			jsonField:   "name",
+			expected:    "em_name",
+			expectError: false,
+		},
+		{
+			name:        "string field",
+			jsonField:   "NamE",
+			expected:    "em_name",
+			expectError: false,
+		},
+		{
+			name:        "integer field",
+			jsonField:   "number",
+			expected:    "em_number",
+			expectError: false,
+		},
+		{
+			name:        "boolean field",
+			jsonField:   "callForwarding",
+			expected:    "em_call_forwarding",
+			expectError: false,
+		},
+		{
+			name:        "nullable string field",
+			jsonField:   "email",
+			expected:    "em_email",
+			expectError: false,
+		},
+		{
+			name:        "tenant id foreign key",
+			jsonField:   "tenantId",
+			expected:    "tm_id",
+			expectError: false,
+		},
+		{
+			name:        "status enum field",
+			jsonField:   "status",
+			expected:    "em_status",
+			expectError: false,
+		},
+		{
+			name:        "last name field",
+			jsonField:   "lastName",
+			expected:    "em_last_name",
+			expectError: false,
+		},
+		{
+			name:        "voicemail service field",
+			jsonField:   "voicemailService",
+			expected:    "em_voicemail_service",
+			expectError: false,
+		},
+		{
+			name:        "invalid field name",
+			jsonField:   "nonExistentField",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:        "empty field name",
+			jsonField:   "",
+			expected:    "",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := FieldToColumn[testStruct](tt.jsonField)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "unknown field")
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
 func TestValues(t *testing.T) {
 	type testStruct struct {
 		ID       int    `gorm:"column:id"`
