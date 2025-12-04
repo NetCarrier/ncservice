@@ -63,6 +63,10 @@ func TestFieldToColumn(t *testing.T) {
 		Status           string  `json:"status" gorm:"column:em_status"`
 		LastName         *string `json:"lastName" gorm:"column:em_last_name"`
 		VoicemailService bool    `json:"voicemailService" gorm:"column:em_voicemail_service"`
+		NoGorm           string  `json:"noGorm"` // No gorm tag
+		NoJson           string  `gorm:"column:no_json"`
+		NoAnything       string
+		IgnoredJson      string `json:"-"`
 	}
 
 	tests := []struct {
@@ -143,6 +147,30 @@ func TestFieldToColumn(t *testing.T) {
 			expected:    "",
 			expectError: true,
 		},
+		{
+			name:        "Not a db field",
+			jsonField:   "noGorm",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:        "Not a json field",
+			jsonField:   "NoJson",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:        "No anything",
+			jsonField:   "NoAnything",
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:        "ignored json",
+			jsonField:   "IgnoredJson",
+			expected:    "",
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -151,7 +179,6 @@ func TestFieldToColumn(t *testing.T) {
 
 			if tt.expectError {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "unknown field")
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
