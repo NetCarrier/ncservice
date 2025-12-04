@@ -171,7 +171,12 @@ func (f crudField) JsonBindings(typ string) string {
 }
 
 func (f crudField) OmitEmpty(typ string) bool {
-	return f.IsNullable() || (typ == "update" && !f.IsRequiredForEdit()) || f.GoRawType() == "bool" || hasExtention(f.Def, "autofill")
+	rt := f.GoRawType()
+	return f.IsNullable() ||
+		(typ == "update" && !f.IsRequiredForEdit()) ||
+		rt == "bool" ||
+		rt == "string" ||
+		hasExtention(f.Def, "autofill")
 }
 
 func (f crudField) BindingTags(typ string) string {
