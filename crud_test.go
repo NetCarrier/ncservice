@@ -118,3 +118,41 @@ func TestSetValues(t *testing.T) {
 	assert.Equal(t, "soccer", *ts2.FavSport)
 	assert.EqualValues(t, "", ts2.Ignore)
 }
+
+func TestDbCols(t *testing.T) {
+	type testStruct struct {
+		A string `gorm:"column:aa" groups:"group1"`
+		B string `gorm:"column:bb"`
+		C string `gorm:"column:cc" groups:"group1,group2"`
+		D string
+	}
+	tests := []struct {
+		target   []string
+		expected string
+	}{
+		{
+			target:   []string{"group2"},
+			expected: "prefix.bb, prefix.cc",
+		},
+		{
+			target:   []string{"group1"},
+			expected: "prefix.aa, prefix.bb, prefix.cc",
+		},
+		{
+			target:   []string{"group3"},
+			expected: "prefix.bb",
+		},
+		{
+			target:   []string{"group1", "group2"},
+			expected: "prefix.aa, prefix.bb, prefix.cc",
+		},
+		{
+			target:   []string{"all"},
+			expected: "prefix.aa, prefix.bb, prefix.cc",
+		},
+	}
+	for _, test := range tests {
+		cols := SqlSelectColumns[testStruct]("prefix.", test.target)
+		assert.Equal(t, test.expected, cols, test.target)
+	}
+}
