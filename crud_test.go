@@ -84,7 +84,7 @@ func TestFieldToColumn(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "string field",
+			name:        "case insensitive field matching",
 			jsonField:   "NamE",
 			expected:    "em_name",
 			expectError: false,
