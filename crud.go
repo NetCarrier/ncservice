@@ -171,7 +171,7 @@ func FieldToColumn[T any](jsonField string) (string, error) {
 
 		// Get the JSON tag to match against the input
 		jsonTag := field.Tag.Get("json")
-		if jsonTag == "" {
+		if jsonTag == "" || jsonTag == "-" {
 			continue
 		}
 
