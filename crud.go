@@ -184,15 +184,12 @@ func FieldToColumn[T any](jsonField string) (string, error) {
 				return "", fmt.Errorf("field %s has no gorm tag", jsonField)
 			}
 
-			// Parse gorm tag to find column name
-			for _, part := range strings.Split(gormTag, ";") {
-				if strings.HasPrefix(part, "column:") {
-					columnName := strings.TrimPrefix(part, "column:")
-					return columnName, nil
-				}
+			// Parse gorm tag to find column name using getGormTag helper
+			columnName, exists := getGormTag(gormTag, "column")
+			if !exists {
+				return "", fmt.Errorf("field %s has no column in gorm tag", jsonField)
 			}
-
-			return "", fmt.Errorf("field %s has no column in gorm tag", jsonField)
+			return columnName, nil
 		}
 	}
 
