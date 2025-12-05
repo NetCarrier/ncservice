@@ -354,6 +354,10 @@ func (f crudField) DefaultValue() *string {
 	return nil
 }
 
+func (f crudField) CustomTags() string {
+	return getExtension(f.Def, "customFieldTags", "")
+}
+
 func (f crudField) GoTypePtr() string {
 	return "*" + f.GoRawType()
 }
