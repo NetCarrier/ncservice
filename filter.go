@@ -11,6 +11,24 @@ func FilterAll(param Value, fld reflect.StructField) bool {
 	return true
 }
 
+func FilterInclude(includedCols []string) ValueFilter {
+	return func(p Value, fld reflect.StructField) bool {
+		return slices.Contains(includedCols, p.Col)
+	}
+}
+
+func FilterExclude(excludedCols []string) ValueFilter {
+	return func(p Value, fld reflect.StructField) bool {
+		return !slices.Contains(excludedCols, p.Col)
+	}
+}
+
+func FilterNot(f ValueFilter) ValueFilter {
+	return func(p Value, fld reflect.StructField) bool {
+		return !f(p, fld)
+	}
+}
+
 func FilterNotNil(param Value, fld reflect.StructField) bool {
 	return param.Val != nil
 }

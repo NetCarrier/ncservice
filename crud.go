@@ -196,12 +196,23 @@ func FieldToColumn[T any](jsonField string) (string, error) {
 	return "", fmt.Errorf("unknown field: %s", jsonField)
 }
 
+// SetValues takes a list of values likely obtained from Values() and sets the corresponding
 func SetValues(h any, values []Value) error {
+	return setValues(h, values, dbColMapper)
+}
+
+// SetJsonValues takes a list of values likely obtained from JsonValues() and sets the corresponding
+func SetJsonValues(h any, values []Value) error {
+	return setValues(h, values, jsonColMapper)
+}
+
+// setValues takes a list of values likely obtained from Values() and sets the corresponding
+func setValues(h any, values []Value, getCol colMapper) error {
 	ref := reflect.ValueOf(h).Elem()
 	t := ref.Type()
 	for i := 0; i < ref.NumField(); i++ {
 		fld := t.Field(i)
-		col, exists := getGormTag(fld.Tag.Get("gorm"), "column")
+		col, exists := getCol(fld)
 		if !exists {
 			continue
 		}
@@ -218,6 +229,7 @@ func SetValues(h any, values []Value) error {
 	return nil
 }
 
+// setValue sets the value of a struct field using reflection, handling type conversion as needed.
 func setValue(to reflect.Value, from Value) error {
 	if !to.CanSet() {
 		return fmt.Errorf("SetValues: cannot set field %s", to.Type().String())
