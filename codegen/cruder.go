@@ -113,21 +113,28 @@ func (c *Cruder) write(out io.Writer, entries []crudItem) error {
 	if err != nil {
 		return err
 	}
+	index := make(map[string]crudItem, len(entries))
+	for _, e := range entries {
+		index[e.Struct()] = e
+	}
 	return t.Execute(out, struct {
-		Cruds   []crudItem
-		Options CrudOptions
-		Enums   map[string]Enum
+		Cruds     []crudItem
+		CrudIndex map[string]crudItem
+		Options   CrudOptions
+		Enums     map[string]Enum
 	}{
-		Cruds:   entries,
-		Options: c.opts,
-		Enums:   c.enumTypes,
+		Cruds:     entries,
+		CrudIndex: index,
+		Options:   c.opts,
+		Enums:     c.enumTypes,
 	})
 }
 
 const (
-	FieldCritNoKeys   = "nokeys"   // list def does not designate it as a key
-	FieldCritKeys     = "keys"     // list def designates it as a key, only keys
-	FieldCritEditable = "editable" // noedit is missing
+	FieldCritNoKeys     = "nokeys"     // list def does not designate it as a key
+	FieldCritKeys       = "keys"       // list def designates it as a key, only keys
+	FieldCritEditable   = "editable"   // noedit is missing
+	FieldCritSearchable = "searchable" // nosearch is missing
 )
 
 func (f crudField) GormTags() string {
@@ -215,6 +222,9 @@ func (v crudItem) Fields(crit ...string) []crudField {
 			if c == FieldCritEditable && !f.IsEditable() {
 				goto skip
 			}
+			if c == FieldCritSearchable && !f.IsSearchable() {
+				goto skip
+			}
 		}
 		out = append(out, f)
 	skip:
@@ -289,6 +299,10 @@ func hasExtention(def meta.Definition, extName string) bool {
 
 func (f crudField) IsEditable() bool {
 	return !hasExtention(f.Def, "noedit")
+}
+
+func (f crudField) IsSearchable() bool {
+	return !hasExtention(f.Def, "nosearch")
 }
 
 func (f crudField) IsNullable() bool {
