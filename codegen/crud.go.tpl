@@ -66,7 +66,7 @@ func (x *{{ .Struct }}) SetOwner(userId string) {
 // {{ .Def.Description}}
 type {{ .Struct }}Create struct {
 {{- range .Fields "editable"}}
-    {{ if not .IsHidden }} {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}" binding:"{{ .BindingTags "create" }}"` // {{ .Def.Description }} {{ end }}
+    {{ .Name }} {{ .GoType }} `json:"{{ .Name | toLowerCamel }}" gorm:"{{ .GormTags }}" binding:"{{ .BindingTags "create" }}"` // {{ .Def.Description }}
 {{- end }}
 }
 

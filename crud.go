@@ -3,7 +3,6 @@ package ncservice
 import (
 	"fmt"
 	"reflect"
-	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -69,7 +68,7 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 
 func GetPrimaryKeyColumn(h any) []string {
 	var cols []string
-	forEachGorm(reflect.ValueOf(h).Elem(), func(fld reflect.StructField, tag string) bool {
+	ForEachGorm(reflect.ValueOf(h).Elem(), func(fld reflect.StructField, tag string) bool {
 		if _, exists := getGormTag(tag, "primaryKey"); exists {
 			col, _ := getGormTag(tag, "column")
 			cols = append(cols, col)
@@ -79,7 +78,7 @@ func GetPrimaryKeyColumn(h any) []string {
 	return cols
 }
 
-func forEachGorm(ref reflect.Value, fn func(fld reflect.StructField, tag string) bool) {
+func ForEachGorm(ref reflect.Value, fn func(fld reflect.StructField, tag string) bool) {
 	t := ref.Type()
 	for i := 0; i < ref.NumField(); i++ {
 		fld := t.Field(i)
@@ -93,7 +92,7 @@ func forEachGorm(ref reflect.Value, fn func(fld reflect.StructField, tag string)
 	}
 }
 
-func forEachTag(h any, tagId string, fn func(f reflect.StructField, v reflect.Value, tag string) bool) {
+func ForEachTag(h any, tagId string, fn func(f reflect.StructField, v reflect.Value, tag string) bool) {
 	ref := reflect.ValueOf(h)
 	if ref.Kind() == reflect.Ptr {
 		ref = ref.Elem()
@@ -114,7 +113,7 @@ func forEachTag(h any, tagId string, fn func(f reflect.StructField, v reflect.Va
 
 func ResolveForeignKeys(db *gorm.DB, x schema.Tabler) error {
 	var err error
-	forEachTag(x, "fk", func(fld reflect.StructField, raw reflect.Value, tag string) bool {
+	ForEachTag(x, "fk", func(fld reflect.StructField, raw reflect.Value, tag string) bool {
 		v := raw
 		// handle pointers to foreign keys as optional FKs: if they exist, they must be valid
 		if raw.Kind() == reflect.Ptr {
@@ -263,29 +262,4 @@ func setValue(to reflect.Value, from Value) error {
 		}
 	}
 	return nil
-}
-
-func SqlSelectColumns[T any](prefix string, target []string) string {
-	var selected []string
-	var t T
-	ref := reflect.ValueOf(t)
-	forEachGorm(ref, func(fld reflect.StructField, col string) bool {
-		groupsStr := fld.Tag.Get("groups")
-		if groupsStr != "" {
-			groups := strings.Split(groupsStr, ",")
-			for _, targetGroup := range target {
-				if targetGroup == GROUP_ALL {
-					goto selection
-				}
-				if slices.Contains(groups, targetGroup) {
-					goto selection
-				}
-			}
-			return true
-		}
-	selection:
-		selected = append(selected, prefix+col)
-		return true
-	})
-	return strings.Join(selected, ", ")
 }

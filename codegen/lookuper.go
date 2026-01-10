@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"text/template"
 
@@ -25,7 +26,8 @@ func NewLookuper(db *sqlx.DB, opts LookupOptions) *Lookuper {
 }
 
 type LookupOptions struct {
-	Lookups []LookupEntryOptions
+	Template string
+	Lookups  []LookupEntryOptions
 }
 
 type lookup struct {
@@ -128,6 +130,8 @@ func (f lookupField) GoType() string {
 type LookupEntryOptions struct {
 	Description string
 	Table       string
+	Query       string
+	Name        string
 	IdColumn    string
 	ValueColumn string
 	Overrides   map[string]string
@@ -145,10 +149,16 @@ func (l *Lookuper) read() ([]lookup, error) {
 	var items []lookup
 	for _, opt := range l.opts.Lookups {
 		item := lookup{
-			Name:    opt.Table,
+			Name:    opt.Name,
 			Options: opt,
 		}
-		sqlstr := fmt.Sprintf(`select * from %s`, opt.Table)
+		if item.Name == "" {
+			item.Name = strcase.UpperCamelCase(opt.Table)
+		}
+		sqlstr := opt.Query
+		if sqlstr == "" {
+			sqlstr = fmt.Sprintf(`select * from %s`, opt.Table)
+		}
 		rows, err := l.db.Queryx(sqlstr)
 		if err != nil {
 			return nil, fmt.Errorf("bad query '%s'. %v", sqlstr, err)
@@ -195,7 +205,7 @@ func (l *Lookuper) write(out io.Writer, entries []lookup) error {
 	funcs := sprig.FuncMap()
 	funcs["toLowerCamel"] = strcase.LowerCamelCase
 
-	tmpl, err := internal.ReadFile("lookup.go.tpl")
+	tmpl, err := os.ReadFile(l.opts.Template)
 	if err != nil {
 		return err
 	}

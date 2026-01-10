@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -42,11 +43,13 @@ type CrudOptions struct {
 }
 
 type CrudOptionsEntry struct {
-	Table string
-	Ydef  string
+	Table    string
+	Ydef     string
+	Criteria []string
 }
 
 type crudItem struct {
+	opts   CrudOptionsEntry
 	Parent *Cruder
 	Def    *meta.List
 	fields []crudField
@@ -81,6 +84,7 @@ func (c *Cruder) read(m *meta.Module) error {
 	c.rootDef = m
 	for _, e := range c.opts.Entries {
 		entry := crudItem{
+			opts:   e,
 			Parent: c,
 		}
 		var valid bool
@@ -133,7 +137,7 @@ func (c *Cruder) write(out io.Writer, entries []crudItem) error {
 const (
 	FieldCritNoKeys     = "nokeys"     // list def does not designate it as a key
 	FieldCritKeys       = "keys"       // list def designates it as a key, only keys
-	FieldCritEditable   = "editable"   // noedit is missing
+	FieldCritEditable   = "editable"   // noedit is missing and not key
 	FieldCritSearchable = "searchable" // nosearch is missing
 )
 
@@ -219,7 +223,7 @@ func (v crudItem) Fields(crit ...string) []crudField {
 			if c == FieldCritNoKeys && f.IsKey() {
 				goto skip
 			}
-			if c == FieldCritEditable && !f.IsEditable() {
+			if c == FieldCritEditable && (!f.IsEditable() || f.IsKey()) {
 				goto skip
 			}
 			if c == FieldCritSearchable && !f.IsSearchable() {
@@ -240,6 +244,10 @@ func (v crudItem) HasLastModified() bool {
 		}
 	}
 	return false
+}
+
+func (f crudItem) HasCriteria(crit string) bool {
+	return slices.Contains(f.opts.Criteria, crit)
 }
 
 type crudField struct {
@@ -313,10 +321,6 @@ func (f crudField) IsRequiredForEdit() bool {
 	return meta.FindExtension("editrequired", f.Def.Extensions()) != nil
 }
 
-func (f crudField) IsHidden() bool {
-	return meta.FindExtension("hidden", f.Def.Extensions()) != nil
-}
-
 func (f crudField) GoType() string {
 	t := f.GoRawType()
 	if f.IsNullable() {
@@ -366,10 +370,6 @@ func (f crudField) DefaultValue() *string {
 		log.Fatalf("unsupported type: %v", val)
 	}
 	return nil
-}
-
-func (f crudField) CustomTags() string {
-	return getExtension(f.Def, "customFieldTags", "")
 }
 
 func (f crudField) GoTypePtr() string {
