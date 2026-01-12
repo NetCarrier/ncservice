@@ -61,7 +61,11 @@ func (c *Cruder) Run(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err = c.read(m); err != nil {
+	return c.run(out, m)
+}
+
+func (c *Cruder) run(out io.Writer, m *meta.Module) error {
+	if err := c.read(m); err != nil {
 		return err
 	}
 	return c.write(out, c.items)
@@ -105,9 +109,26 @@ func (c *Cruder) read(m *meta.Module) error {
 	return nil
 }
 
+func yangRange(r *meta.RangeEntry) string {
+	min := int64(-1)
+	max := int64(-1)
+	exact := int64(-1)
+	if !r.Exact.Empty() {
+		exact = *r.Exact.Integer()
+	}
+	if !r.Min.Empty() {
+		min = *r.Min.Integer()
+	}
+	if !r.Max.Empty() {
+		max = *r.Max.Integer()
+	}
+	return fmt.Sprintf("%d, %d, %d", exact, min, max)
+}
+
 func (c *Cruder) write(out io.Writer, entries []crudItem) error {
 	funcs := sprig.FuncMap()
 	funcs["toLowerCamel"] = strcase.LowerCamelCase
+	funcs["yangRange"] = yangRange
 
 	tmpl, err := os.ReadFile(c.opts.Template)
 	if err != nil {
@@ -391,7 +412,7 @@ func (f crudField) GoRawType() string {
 		case "boolean":
 			goType = "bool"
 		default:
-			goType = typeIdent
+			goType = t.Format().String()
 		}
 	}
 
