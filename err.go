@@ -11,3 +11,4 @@ func (e Err) Error() string {
 
 var ErrNotFound = Err{404, "not found"}
 var ErrPermissionDenied = Err{403, "permission denied"}
+var ErrUser = Err{400, "user error"}

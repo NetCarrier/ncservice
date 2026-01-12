@@ -411,6 +411,8 @@ func (f crudField) GoRawType() string {
 			goType = "time.Time"
 		case "boolean":
 			goType = "bool"
+		case "string":
+			goType = "string"
 		default:
 			goType = t.Format().String()
 		}
