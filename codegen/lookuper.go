@@ -2,32 +2,22 @@ package codegen
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"regexp"
-	"text/template"
 
-	"github.com/Masterminds/sprig"
 	"github.com/jmoiron/sqlx"
 	"github.com/stoewer/go-strcase"
 )
 
 // lookuper helps generate lookup code based on DB tables
 type Lookuper struct {
-	db   *sqlx.DB
-	opts LookupOptions
-}
-
-func NewLookuper(db *sqlx.DB, opts LookupOptions) *Lookuper {
-	return &Lookuper{
-		db:   db,
-		opts: opts,
-	}
+	db      *sqlx.DB
+	opts    LookupOptions
+	Entries []lookup
 }
 
 type LookupOptions struct {
 	Template string
-	Lookups  []LookupEntryOptions
+	Entries  []LookupEntryOptions
 }
 
 type lookup struct {
@@ -137,17 +127,10 @@ type LookupEntryOptions struct {
 	Overrides   map[string]string
 }
 
-func (l *Lookuper) Run(out io.Writer) error {
-	items, err := l.read()
-	if err != nil {
-		return err
-	}
-	return l.write(out, items)
-}
-
-func (l *Lookuper) read() ([]lookup, error) {
-	var items []lookup
-	for _, opt := range l.opts.Lookups {
+func (l *Lookuper) Run(opts LookupOptions, db *sqlx.DB) error {
+	l.db = db
+	l.opts = opts
+	for _, opt := range l.opts.Entries {
 		item := lookup{
 			Name:    opt.Name,
 			Options: opt,
@@ -161,13 +144,13 @@ func (l *Lookuper) read() ([]lookup, error) {
 		}
 		rows, err := l.db.Queryx(sqlstr)
 		if err != nil {
-			return nil, fmt.Errorf("bad query '%s'. %v", sqlstr, err)
+			return fmt.Errorf("bad query '%s'. %v", sqlstr, err)
 		}
 		defer rows.Close()
 
 		types, err := rows.ColumnTypes()
 		if err != nil {
-			return nil, fmt.Errorf("failure to get column types for table %s. %v", opt.Table, err)
+			return fmt.Errorf("failure to get column types for table %s. %v", opt.Table, err)
 		}
 		for _, ct := range types {
 			fld := lookupField{
@@ -184,7 +167,7 @@ func (l *Lookuper) read() ([]lookup, error) {
 			var row []any = make([]any, len(types))
 			row, err := rows.SliceScan()
 			if err != nil {
-				return nil, fmt.Errorf("failure to read row . %v", err)
+				return fmt.Errorf("failure to read row . %v", err)
 			}
 			for col, val := range row {
 				fldVal := lookupFieldValue{
@@ -195,23 +178,8 @@ func (l *Lookuper) read() ([]lookup, error) {
 			}
 			item.Entries = append(item.Entries, entry)
 		}
-		items = append(items, item)
+		l.Entries = append(l.Entries, item)
 	}
 
-	return items, nil
-}
-
-func (l *Lookuper) write(out io.Writer, entries []lookup) error {
-	funcs := sprig.FuncMap()
-	funcs["toLowerCamel"] = strcase.LowerCamelCase
-
-	tmpl, err := os.ReadFile(l.opts.Template)
-	if err != nil {
-		return err
-	}
-	t, err := template.New("main").Funcs(funcs).Parse(string(tmpl))
-	if err != nil {
-		return err
-	}
-	return t.Execute(out, struct{ Lookups []lookup }{Lookups: entries})
+	return nil
 }

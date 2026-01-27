@@ -32,5 +32,5 @@ func TestCrudItem(t *testing.T) {
 	}
 	c := NewCruder(opts)
 	require.NoError(t, c.read(m))
-	assert.Equal(t, "string", c.items[0].fields[0].GoType())
+	assert.Equal(t, "string", c.Entries[0].fields[0].GoType())
 }

@@ -2,14 +2,10 @@ package codegen
 
 import (
 	"fmt"
-	"io"
 	"log"
-	"os"
 	"slices"
 	"strings"
-	"text/template"
 
-	"github.com/Masterminds/sprig"
 	"github.com/NetCarrier/ncservice"
 	"github.com/freeconf/yang/meta"
 	"github.com/freeconf/yang/parser"
@@ -20,22 +16,21 @@ import (
 
 // cruder helps generate CRUD code based on YANG definitions
 type Cruder struct {
-	opts      CrudOptions
-	enumTypes map[string]Enum
-	items     []crudItem
-	rootDef   *meta.Module
+	Options CrudOptions
+	Enums   map[string]Enum
+	Entries []crudItem
+	Index   map[string]crudItem
+	rootDef *meta.Module
 }
 
 func NewCruder(opts CrudOptions) *Cruder {
 	return &Cruder{
-		opts:      opts,
-		enumTypes: make(map[string]Enum),
+		Options: opts,
+		Enums:   make(map[string]Enum),
 	}
 }
 
 type CrudOptions struct {
-	Template   string
-	Package    string
 	YangPath   string
 	YangModule string
 	Entries    []CrudOptionsEntry
@@ -55,26 +50,20 @@ type crudItem struct {
 	fields []crudField
 }
 
-func (c *Cruder) Run(out io.Writer) error {
-	ypath := source.Path(c.opts.YangPath)
-	m, err := parser.LoadModule(ypath, c.opts.YangModule)
+func (c *Cruder) Run(opts CrudOptions) error {
+	c.Options = opts
+	ypath := source.Path(c.Options.YangPath)
+	m, err := parser.LoadModule(ypath, c.Options.YangModule)
 	if err != nil {
 		return err
 	}
-	return c.run(out, m)
-}
-
-func (c *Cruder) run(out io.Writer, m *meta.Module) error {
-	if err := c.read(m); err != nil {
-		return err
-	}
-	return c.write(out, c.items)
+	return c.read(m)
 }
 
 // TargetField finds the field definition for the given path. Useful for
 // leafRefs that point to another definition.
 func (c *Cruder) resolveFieldPath(target meta.Leafable) crudField {
-	for _, i := range c.items {
+	for _, i := range c.Entries {
 		for _, f := range i.fields {
 			if f.Def == target {
 				return f
@@ -85,8 +74,9 @@ func (c *Cruder) resolveFieldPath(target meta.Leafable) crudField {
 }
 
 func (c *Cruder) read(m *meta.Module) error {
+	c.Enums = make(map[string]Enum)
 	c.rootDef = m
-	for _, e := range c.opts.Entries {
+	for _, e := range c.Options.Entries {
 		entry := crudItem{
 			opts:   e,
 			Parent: c,
@@ -104,12 +94,18 @@ func (c *Cruder) read(m *meta.Module) error {
 			entry.fields = append(entry.fields, f)
 		}
 
-		c.items = append(c.items, entry)
+		c.Entries = append(c.Entries, entry)
 	}
+
+	c.Index = make(map[string]crudItem, len(c.Entries))
+	for _, e := range c.Entries {
+		c.Index[e.Struct()] = e
+	}
+
 	return nil
 }
 
-func yangRange(r *meta.RangeEntry) string {
+func YangRange(r *meta.RangeEntry) string {
 	min := int64(-1)
 	max := int64(-1)
 	exact := int64(-1)
@@ -125,42 +121,24 @@ func yangRange(r *meta.RangeEntry) string {
 	return fmt.Sprintf("%d, %d, %d", exact, min, max)
 }
 
-func (c *Cruder) write(out io.Writer, entries []crudItem) error {
-	funcs := sprig.FuncMap()
-	funcs["toLowerCamel"] = strcase.LowerCamelCase
-	funcs["yangRange"] = yangRange
-
-	tmpl, err := os.ReadFile(c.opts.Template)
-	if err != nil {
-		return err
-	}
-	t, err := template.New("main").Funcs(funcs).Parse(string(tmpl))
-	if err != nil {
-		return err
-	}
-	index := make(map[string]crudItem, len(entries))
-	for _, e := range entries {
-		index[e.Struct()] = e
-	}
-	return t.Execute(out, struct {
-		Cruds     []crudItem
-		CrudIndex map[string]crudItem
-		Options   CrudOptions
-		Enums     map[string]Enum
-	}{
-		Cruds:     entries,
-		CrudIndex: index,
-		Options:   c.opts,
-		Enums:     c.enumTypes,
-	})
-}
-
 const (
 	FieldCritNoKeys     = "nokeys"     // list def does not designate it as a key
 	FieldCritKeys       = "keys"       // list def designates it as a key, only keys
 	FieldCritEditable   = "editable"   // noedit is missing and not key
 	FieldCritSearchable = "searchable" // nosearch is missing
 )
+
+func (f crudField) EnumTag() string {
+	if f.Def.Type().Format() != val.FmtEnum {
+		return ""
+	}
+	enums := f.Def.Type().Enums()
+	options := make([]string, len(enums))
+	for i, e := range enums {
+		options[i] = e.Ident()
+	}
+	return fmt.Sprintf(` enum:"%s"`, strings.Join(options, ","))
+}
 
 func (f crudField) GormTags() string {
 	tags := []string{
@@ -305,7 +283,7 @@ func (f crudField) Name() string {
 
 func (f crudField) Col() string {
 	var col string
-	if f.Parent.Parent.opts.SnakeCase {
+	if f.Parent.Parent.Options.SnakeCase {
 		col = ncservice.SnakeCase(f.Def.Ident())
 	} else {
 		col = strcase.UpperCamelCase(f.Def.Ident())
@@ -314,7 +292,7 @@ func (f crudField) Col() string {
 	return getExtension(f.Def, "col", col)
 }
 
-func getExtension(def meta.Definition, extName string, defaultValue string) string {
+func getExtension(def meta.HasExtensions, extName string, defaultValue string) string {
 	x := meta.FindExtension(extName, def.Extensions())
 	if x != nil {
 		return x.Argument()
@@ -351,11 +329,11 @@ func (f crudField) GoType() string {
 }
 
 func (f crudField) isEnum() bool {
-	return f.Parent.Parent.enumTypes[f.GoRawType()].Name != ""
+	return f.Parent.Parent.Enums[f.GoRawType()].Name != ""
 }
 
 func (f crudField) getEnumValues() []EnumValue {
-	return f.Parent.Parent.enumTypes[f.GoRawType()].Values()
+	return f.Parent.Parent.Enums[f.GoRawType()].Values()
 }
 
 func (f crudField) getEnumType() string {
@@ -369,7 +347,7 @@ func (f crudField) getEnumType() string {
 		e.Name = strcase.UpperCamelCase(f.Def.Type().Ident())
 		e.Prefix = e.Name
 	}
-	f.Parent.Parent.enumTypes[e.Name] = e
+	f.Parent.Parent.Enums[e.Name] = e
 	return e.Name
 }
 
@@ -399,7 +377,10 @@ func (f crudField) GoTypePtr() string {
 
 func (f crudField) GoRawType() string {
 	t := f.Def.Type().Resolve()
-	var goType string
+	goType := getExtension(t, "gotype", "")
+	if goType != "" {
+		return goType
+	}
 	if t.Format() == val.FmtEnum {
 		goType = f.getEnumType()
 	} else {
