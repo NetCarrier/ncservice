@@ -124,7 +124,8 @@ func YangRange(r *meta.RangeEntry) string {
 const (
 	FieldCritNoKeys     = "nokeys"     // list def does not designate it as a key
 	FieldCritKeys       = "keys"       // list def designates it as a key, only keys
-	FieldCritEditable   = "editable"   // noedit is missing and not key
+	FieldCritEditable   = "editable"   // fields that can be sent then editing object (sans keys)
+	FieldCritCreateable = "createable" // fields that can be sent then creating object (sans keys unless keys are marked createble)
 	FieldCritSearchable = "searchable" // nosearch is missing
 )
 
@@ -182,8 +183,12 @@ func (f crudField) JsonBindings(typ string) string {
 
 func (f crudField) OmitEmpty(typ string) bool {
 	rt := f.GoRawType()
+	// for key is not automatically generated, we must include it in the creation process
+	if typ == "create" && f.IsKey() {
+		return false
+	}
 	return f.IsNullable() ||
-		(typ == "update" && !f.IsRequiredForEdit()) ||
+		typ == "update" ||
 		rt == "bool" ||
 		rt == "string" ||
 		hasExtention(f.Def, "autofill")
@@ -222,7 +227,10 @@ func (v crudItem) Fields(crit ...string) []crudField {
 			if c == FieldCritNoKeys && f.IsKey() {
 				goto skip
 			}
-			if c == FieldCritEditable && (!f.IsEditable() || f.IsKey()) {
+			if c == FieldCritEditable && !f.IsEditable() {
+				goto skip
+			}
+			if c == FieldCritCreateable && !f.IsCreateable() {
 				goto skip
 			}
 			if c == FieldCritSearchable && !f.IsSearchable() {
@@ -305,7 +313,11 @@ func hasExtention(def meta.Definition, extName string) bool {
 }
 
 func (f crudField) IsEditable() bool {
-	return !hasExtention(f.Def, "noedit")
+	return !hasExtention(f.Def, "noedit") && !f.IsKey()
+}
+
+func (f crudField) IsCreateable() bool {
+	return !hasExtention(f.Def, "noedit") && (hasExtention(f.Def, "createable") || !f.IsKey())
 }
 
 func (f crudField) IsSearchable() bool {
