@@ -124,8 +124,8 @@ func YangRange(r *meta.RangeEntry) string {
 const (
 	FieldCritNoKeys     = "nokeys"     // list def does not designate it as a key
 	FieldCritKeys       = "keys"       // list def designates it as a key, only keys
-	FieldCritEditable   = "editable"   // fields that can be sent then editing object (sans keys)
-	FieldCritCreateable = "createable" // fields that can be sent then creating object (sans keys unless keys are marked createble)
+	FieldCritUpdateable = "updateable" // fields that can be sent when updating object (sans keys)
+	FieldCritCreateable = "createable" // fields that can be sent when creating object (sans keys unless keys are marked createble)
 	FieldCritSearchable = "searchable" // nosearch is missing
 )
 
@@ -227,7 +227,7 @@ func (v crudItem) Fields(crit ...string) []crudField {
 			if c == FieldCritNoKeys && f.IsKey() {
 				goto skip
 			}
-			if c == FieldCritEditable && !f.IsEditable() {
+			if c == FieldCritUpdateable && !f.IsUpdateable() {
 				goto skip
 			}
 			if c == FieldCritCreateable && !f.IsCreateable() {
@@ -312,24 +312,46 @@ func hasExtention(def meta.Definition, extName string) bool {
 	return meta.FindExtension(extName, def.Extensions()) != nil
 }
 
+func isYesOrNo(def meta.Definition, extName string) (bool, bool) {
+	switch getExtension(def, extName, "") {
+	case "yes":
+		return true, true
+	case "no":
+		return false, true
+	}
+	return false, false
+}
+
 func (f crudField) IsEditable() bool {
-	return !hasExtention(f.Def, "noedit") && !f.IsKey()
+	if v, valid := isYesOrNo(f.Def, "editable"); valid {
+		return v
+	}
+	return !f.IsKey()
+}
+
+func (f crudField) IsUpdateable() bool {
+	if v, valid := isYesOrNo(f.Def, "updateable"); valid {
+		return v
+	}
+	return f.IsEditable()
 }
 
 func (f crudField) IsCreateable() bool {
-	return !hasExtention(f.Def, "noedit") && (hasExtention(f.Def, "createable") || !f.IsKey())
+	if v, valid := isYesOrNo(f.Def, "createable"); valid {
+		return v
+	}
+	return f.IsEditable()
 }
 
 func (f crudField) IsSearchable() bool {
-	return !hasExtention(f.Def, "nosearch")
+	if v, valid := isYesOrNo(f.Def, "searchable"); valid {
+		return v
+	}
+	return true
 }
 
 func (f crudField) IsNullable() bool {
 	return hasExtention(f.Def, "nullable")
-}
-
-func (f crudField) IsRequiredForEdit() bool {
-	return meta.FindExtension("editrequired", f.Def.Extensions()) != nil
 }
 
 func (f crudField) GoType() string {
