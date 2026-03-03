@@ -428,6 +428,8 @@ func (f crudField) GoRawType() string {
 			goType = "bool"
 		case "string":
 			goType = "string"
+		case "decimal64":
+			goType = "float64"
 		default:
 			goType = t.Format().String()
 		}

@@ -19,7 +19,7 @@ var mssqlArg = flag.String("mssql", "", "DB connection string for SQL Server")
 var mysqlArg = flag.String("mysql", "", "DB connection string for MySQL")
 
 var tbl = flag.String("table", "", "Table name to generate YANG for.")
-var colsArg = flag.Bool("cols", false, "Add column annotations.")
+var colsArg = flag.Bool("cols", true, "Add column annotations.")
 
 func main() {
 	flag.Parse()
@@ -107,33 +107,37 @@ func WriteYang(data tableData, out *os.File) error {
 		},
 	})
 	tmpl, err = tmpl.Parse(`
-	list {{.Name | camel }} {
-		description "Auto-generated from table {{.Name}}";
-		
-		x:table "{{.Name}}";
-		{{- if is "notnil" .PrimaryKey }}
-		key {{ .PrimaryKey }};{{ end }}
-		{{range .Columns}}
-		leaf {{.Name | camel }} {
-			{{- if .IsEnum }}
-			type enumeration {
-				{{- range .EnumValues }}
-				enum {{ . }};{{ end }}
-			}
-			{{- else }}
-			type {{.YangType}};
-			{{- end }}
-			{{- if is "notnil" .Description }}
-			description "{{ .Description }}";{{ end }}
-			{{- if or .IsNullable (is "notnil" .DefaultValue) }}
-			x:nullable;{{ end }}
-			{{- if $.ShowCols }}
-			{{- if is "notnil" .DefaultValue }}
-			default {{ .DefaultValue }};{{ end }}
-			x:col "{{.Name}}";{{ end }}
-		}
-		{{end}}
-	}
+    list {{.Name | camel }} {		
+        x:table "{{.Name}}";
+{{- if is "notnil" .PrimaryKey }}
+        key {{ .PrimaryKey }};
+{{- end }}
+{{range .Columns}}
+        leaf {{.Name | camel }} {
+	{{- if .IsEnum }}
+            type enumeration {
+		{{- range .EnumValues }}
+                enum {{ . }};
+		{{- end }}
+            }
+	{{- else }}
+            type {{.YangType}};
+	{{- end }}
+	{{- if is "notnil" .Description }}
+            description "{{ .Description }}";
+	{{- end }}
+	{{- if or .IsNullable (is "notnil" .DefaultValue) }}
+            x:nullable;
+	{{- end }}
+	{{- if $.ShowCols }}
+		{{- if is "notnil" .DefaultValue }}
+            default {{ .DefaultValue }};
+		{{- end }}
+            x:col "{{.Name}}";
+	{{- end }}
+        }
+{{- end}}
+    }
 `)
 	if err != nil {
 		return err

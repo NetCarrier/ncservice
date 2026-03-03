@@ -33,6 +33,46 @@ func FilterNotNil(param Value, fld reflect.StructField) bool {
 	return param.Val != nil
 }
 
+// FilterNotEqual is like a diff useful to tell the difference of an object for before and after
+func DiffVals(origVals []Value, updatedVals []Value) []DiffVal {
+	var diff []DiffVal
+
+outer1:
+	for _, orig := range origVals {
+		found := DiffVal{Col: orig.Col, Orig: orig.Val}
+		for _, updated := range updatedVals {
+			if orig.Col == updated.Col {
+				if reflect.DeepEqual(orig.Val, updated.Val) {
+					continue outer1
+				} else {
+					found.Updated = updated.Val
+					break
+				}
+			}
+		}
+		diff = append(diff, found)
+	}
+
+outer2:
+	for _, updated := range updatedVals {
+		found := DiffVal{Col: updated.Col, Updated: updated.Val}
+		for _, orig := range origVals {
+			if orig.Col == updated.Col {
+				continue outer2
+			}
+		}
+		diff = append(diff, found)
+	}
+
+	return diff
+}
+
+type DiffVal struct {
+	Col     string
+	Orig    any
+	Updated any
+}
+
 func FilterAnd(f ...ValueFilter) ValueFilter {
 	return func(p Value, fld reflect.StructField) bool {
 		for _, f1 := range f {
