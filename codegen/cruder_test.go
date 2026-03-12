@@ -17,6 +17,9 @@ func TestCrudItem(t *testing.T) {
 			leaf y {
 				type t;
 			}
+			leaf-list z {
+				type int32;
+			}
 		}
 	}
 	`
@@ -32,5 +35,10 @@ func TestCrudItem(t *testing.T) {
 	}
 	c := NewCruder(opts)
 	require.NoError(t, c.read(m))
-	assert.Equal(t, "string", c.Entries[0].fields[0].GoType())
+	x := c.Entries[0].fields[0]
+	assert.Equal(t, "string", x.GoType())
+	assert.Equal(t, "required", x.BindingTags("create"))
+	z := c.Entries[0].fields[1]
+	assert.Equal(t, "[]int", z.GoType())
+	assert.Equal(t, "omitempty", z.BindingTags("create"))
 }

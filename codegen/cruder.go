@@ -175,28 +175,28 @@ func (f crudField) GroupsTag() string {
 }
 
 func (f crudField) JsonBindings(typ string) string {
-	if f.OmitEmpty(typ) {
+	if f.Optional(typ) {
 		return ",omitempty"
 	}
 	return ""
 }
 
-func (f crudField) OmitEmpty(typ string) bool {
-	rt := f.GoRawType()
+func (f crudField) Optional(typ string) bool {
 	// for key is not automatically generated, we must include it in the creation process
 	if typ == "create" && f.IsKey() {
 		return false
 	}
+	rt := f.GoRawType()
 	return f.IsNullable() ||
 		typ == "update" ||
-		rt == "bool" ||
-		rt == "string" ||
-		hasExtention(f.Def, "autofill")
+		rt == "bool" || // the premise that bool default to false when not passed in
+		strings.HasPrefix(rt, "[]") || // arrays are like ptrs
+		f.DefaultValue() != nil
 }
 
 func (f crudField) BindingTags(typ string) string {
 	tags := []string{}
-	if f.OmitEmpty(typ) {
+	if f.Optional(typ) {
 		tags = append(tags, "omitempty")
 	} else {
 		tags = append(tags, "required")
