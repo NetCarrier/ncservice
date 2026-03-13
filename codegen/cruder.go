@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -159,7 +160,7 @@ func (f crudField) GormTags() string {
 }
 
 func (f crudField) JsonSchemaTag() string {
-	desc := f.Def.(meta.Describable).Description()
+	desc := f.Description()
 	if desc != "" {
 		return fmt.Sprintf(` jsonschema:"%s"`, desc)
 	}
@@ -260,6 +261,53 @@ func (f crudItem) HasCriteria(crit string) bool {
 type crudField struct {
 	Parent crudItem
 	Def    meta.Leafable
+}
+
+// describeRegex handles regexs that do not render will in Go's tag descriptions
+// and therefore do not make it to docs/AI meta. Make an attempt to take
+// the common patterns, but
+func describeRegex(s string) (string, bool) {
+	switch s {
+	case `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`:
+		return "any email address", true
+	case `((\+[0-9]{3})|0)?[0-9]{3}[-]?[0-9]{4}`:
+		return "any full or partial phone number like +0441234567, 123-4567 or 1234567", true
+	case `(\(?\d{1,4}\)?[\s.-]?)?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{1,7}`:
+		return "a full phone number with some formatting flexiblity like '1 (417) 232-2314' or '2342341342'", true
+	}
+	if strings.ContainsAny(s, `\"'`) {
+		slog.Error("cannot place regex in docs so consider updating describeRegex to swap it with human equivalent", "regex", s)
+		return "", false
+	}
+	return s, true
+}
+
+func (f crudField) Description() string {
+	desc := f.Def.(meta.Describable).Description()
+	var patterns []string
+	for _, p := range f.Def.Type().Patterns() {
+		if s, describable := describeRegex(p.Pattern); describable {
+			patterns = append(patterns, s)
+		}
+	}
+	if len(patterns) > 0 {
+		desc += ". Supported regular expressions: " + strings.Join(patterns, ", ")
+	}
+	var lengths []string
+	for _, r := range f.Def.Type().Length() {
+		lengths = append(lengths, r.String())
+	}
+	if len(lengths) > 0 {
+		desc += ". Allowed string length: " + strings.Join(lengths, ", ")
+	}
+	var ranges []string
+	for _, r := range f.Def.Type().Range() {
+		ranges = append(ranges, r.String())
+	}
+	if len(ranges) > 0 {
+		desc += ". Allowed number ranges: " + strings.Join(ranges, ", ")
+	}
+	return desc
 }
 
 func (f crudField) IsKey() bool {

@@ -20,6 +20,19 @@ func TestCrudItem(t *testing.T) {
 			leaf-list z {
 				type int32;
 			}
+			leaf og {
+			   description "Original Gangster";
+			   type string {
+			      pattern "[A-Z+]";
+				  length "3..5";
+			   }
+			}
+			leaf n {
+			  description "Number";
+			  type int32 {
+				  range "10..500";
+			  }
+			}
 		}
 	}
 	`
@@ -41,4 +54,8 @@ func TestCrudItem(t *testing.T) {
 	z := c.Entries[0].fields[1]
 	assert.Equal(t, "[]int", z.GoType())
 	assert.Equal(t, "omitempty", z.BindingTags("create"))
+	og := c.Entries[0].fields[2]
+	assert.Equal(t, "Original Gangster. Supported regular expressions: [A-Z+]. Allowed string length: 3..5", og.Description())
+	n := c.Entries[0].fields[3]
+	assert.Equal(t, "Number. Allowed number ranges: 10..500", n.Description())
 }
