@@ -128,21 +128,26 @@ func ResolveForeignKeys(db *gorm.DB, x schema.Tabler) error {
 		}
 		targetTable := parts[0]
 		targetCol := parts[1]
-		var exists bool
 		id := v.Interface()
-		sql := fmt.Sprintf("select exists(select 1 from %s where %s = ?)", targetTable, targetCol)
-		err = db.Raw(sql, id).Scan(&exists).Error
-		if err != nil {
-			err = fmt.Errorf("erorr checking foreign key. %w", err)
-			return false
-		}
-		if !exists {
-			err = fmt.Errorf("foreign key constraint failed: %s.%s=%v does not exist", targetTable, targetCol, id)
+		if err = ValidateForeignKey(db, targetTable, targetCol, id); err != nil {
 			return false
 		}
 		return true
 	})
 	return err
+}
+
+func ValidateForeignKey(db *gorm.DB, targetTable string, targetCol string, id any) error {
+	var exists bool
+	sql := fmt.Sprintf("select exists(select 1 from %s where %s = ?)", targetTable, targetCol)
+	err := db.Raw(sql, id).Scan(&exists).Error
+	if err != nil {
+		return fmt.Errorf("erorr checking foreign key. %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("foreign key constraint failed: %s.%s=%v does not exist", targetTable, targetCol, id)
+	}
+	return nil
 }
 
 func getGormTag(tag string, target string) (string, bool) {
