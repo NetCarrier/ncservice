@@ -392,8 +392,9 @@ func (f crudField) IsCreateable() bool {
 }
 
 func (f crudField) IsSearchable() bool {
-	if v, valid := isYesOrNo(f.Def, "searchable"); valid {
-		return v
+	switch getExtension(f.Def, "searchopts", "") {
+	case "no":
+		return false
 	}
 	return true
 }
@@ -451,6 +452,22 @@ func (f crudField) DefaultValue() *string {
 		log.Fatalf("unsupported type: %v", val)
 	}
 	return nil
+}
+
+func (f crudField) SearchType() string {
+	ptrType := f.GoTypePtr()
+	override := getExtension(f.Def, "searchopts", "")
+	if override != "none" {
+		switch ptrType {
+		case "*string":
+			return "*database.StringField"
+		case "*int", "*int64", "*uint", "*uint64", "*float64":
+			return "*database.NumberField[" + f.GoRawType() + "]"
+		case "*time.Time":
+			return "*database.DateField"
+		}
+	}
+	return ptrType
 }
 
 func (f crudField) GoTypePtr() string {
