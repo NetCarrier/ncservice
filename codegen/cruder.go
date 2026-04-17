@@ -167,10 +167,9 @@ func (f crudField) JsonSchemaTag() string {
 	return ""
 }
 
-func (f crudField) GroupsTag() string {
-	groups := getExtension(f.Def, "groups", "")
-	if groups != "" {
-		return fmt.Sprintf(` groups:"%s"`, groups)
+func (f crudField) ShowTag() string {
+	if hasExtention(f.Def, "showFull") {
+		return ` show:"full"`
 	}
 	return ""
 }
@@ -207,7 +206,7 @@ func (f crudField) BindingTags(typ string) string {
 		values := []string{}
 		for _, val := range f.getEnumValues() {
 			if val.Parent.GoType() == "string" {
-				values = append(values, fmt.Sprintf("'%s'", val.Def.Ident()))
+				values = append(values, fmt.Sprintf("'%s'", val.Value()))
 			} else {
 				values = append(values, fmt.Sprintf("%d", val.Def.Value()))
 			}
@@ -539,8 +538,12 @@ func (ev EnumValue) Ident() string {
 }
 
 func (ev EnumValue) Value() string {
+	return ev.Def.Ident()
+}
+
+func (ev EnumValue) DatabaseValue() string {
 	if ev.Parent.GoType() == "string" {
-		return fmt.Sprintf("%q", ev.Def.Ident())
+		return fmt.Sprintf("%q", getExtension(ev.Def, "enumvalue", ev.Def.Ident()))
 	}
 	return fmt.Sprintf("%d", ev.Def.Value())
 }
