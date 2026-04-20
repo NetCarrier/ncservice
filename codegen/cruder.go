@@ -159,12 +159,22 @@ func (f crudField) GormTags() string {
 	return strings.Join(tags, ";")
 }
 
+func appendSentance(s string, sentence string) string {
+	if s == "" {
+		return sentence
+	}
+	return s + ". " + sentence
+}
+
 func (f crudField) JsonSchemaTag() string {
 	desc := f.Description()
-	if desc != "" {
-		return fmt.Sprintf(` jsonschema:"%s"`, desc)
+	if f.isEnum() {
+		desc = appendSentance(desc, "Allowed values: "+strings.Join(f.getEnumValuesAsStrings(), ", "))
 	}
-	return ""
+	if desc != "" {
+		desc = fmt.Sprintf(` jsonschema:"%s"`, desc)
+	}
+	return desc
 }
 
 func (f crudField) ShowTag() string {
@@ -203,18 +213,22 @@ func (f crudField) BindingTags(typ string) string {
 	}
 	if f.isEnum() {
 		// Add oneof tag for validation
-		values := []string{}
-		for _, val := range f.getEnumValues() {
-			if val.Parent.GoType() == "string" {
-				values = append(values, fmt.Sprintf("'%s'", val.Value()))
-			} else {
-				values = append(values, fmt.Sprintf("%d", val.Def.Value()))
-			}
-		}
-		oneofValues := strings.Join(values, " ")
+		oneofValues := strings.Join(f.getEnumValuesAsStrings(), " ")
 		tags = append(tags, fmt.Sprintf("oneof=%v", oneofValues))
 	}
 	return strings.Join(tags, ",")
+}
+
+func (f crudField) getEnumValuesAsStrings() []string {
+	values := []string{}
+	for _, val := range f.getEnumValues() {
+		if val.Parent.GoType() == "string" {
+			values = append(values, fmt.Sprintf("'%s'", val.Value()))
+		} else {
+			values = append(values, fmt.Sprintf("%d", val.Def.Value()))
+		}
+	}
+	return values
 }
 
 func (v crudItem) Fields(crit ...string) []crudField {
