@@ -67,13 +67,15 @@ func TestFieldToColumn(t *testing.T) {
 		NoJson           string  `gorm:"column:no_json"`
 		NoAnything       string
 		IgnoredJson      string `json:"-"`
+		OtherTable       string `json:"otherTable" gorm:"column:this_col" table:"another_table"`
 	}
 
 	tests := []struct {
-		name        string
-		jsonField   string
-		expected    string
-		expectError bool
+		name          string
+		jsonField     string
+		expected      string
+		expectedTable string
+		expectError   bool
 	}{
 		{
 			name:        "primary key field",
@@ -171,17 +173,24 @@ func TestFieldToColumn(t *testing.T) {
 			expected:    "",
 			expectError: true,
 		},
+		{
+			name:          "table field",
+			jsonField:     "OtherTable",
+			expected:      "this_col",
+			expectedTable: "another_table",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := FieldToColumn[testStruct](tt.jsonField)
+			result, tbl, err := FieldToColumn[testStruct](tt.jsonField)
 
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
+				assert.Equal(t, tt.expectedTable, tbl)
 			}
 		})
 	}

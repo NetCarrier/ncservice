@@ -156,6 +156,9 @@ func (f crudField) GormTags() string {
 	if f.DefaultValue() != nil {
 		tags = append(tags, "default:"+*f.DefaultValue())
 	}
+	if hasExtention(f.Def, "table") {
+		tags = append(tags, "->:false")
+	}
 	return strings.Join(tags, ";")
 }
 
@@ -373,35 +376,28 @@ func hasExtention(def meta.Definition, extName string) bool {
 	return meta.FindExtension(extName, def.Extensions()) != nil
 }
 
-func isYesOrNo(def meta.Definition, extName string) (bool, bool) {
-	switch getExtension(def, extName, "") {
-	case "yes":
-		return true, true
-	case "no":
-		return false, true
-	}
-	return false, false
+func (f crudField) scopes() []string {
+	return strings.Split(getExtension(f.Def, "scopes", "create,read,update"), ",")
 }
 
-func (f crudField) IsEditable() bool {
-	if v, valid := isYesOrNo(f.Def, "editable"); valid {
-		return v
-	}
-	return !f.IsKey()
+func (f crudField) hasCustomScopes() bool {
+	return hasExtention(f.Def, "scopes")
 }
 
 func (f crudField) IsUpdateable() bool {
-	if v, valid := isYesOrNo(f.Def, "updateable"); valid {
-		return v
-	}
-	return f.IsEditable()
+	updateable := slices.Contains(f.scopes(), "update")
+	return updateable &&
+		(!f.IsKey() || f.hasCustomScopes()) // keys are not updateable unless explicitly marked createable, but even then it's safer to not allow updates
 }
 
 func (f crudField) IsCreateable() bool {
-	if v, valid := isYesOrNo(f.Def, "createable"); valid {
-		return v
-	}
-	return f.IsEditable()
+	createable := slices.Contains(f.scopes(), "create")
+	return createable &&
+		(!f.IsKey() || f.hasCustomScopes())
+}
+
+func (f crudField) IsReadable() bool {
+	return slices.Contains(f.scopes(), "read")
 }
 
 func (f crudField) IsSearchable() bool {
@@ -409,7 +405,7 @@ func (f crudField) IsSearchable() bool {
 	case "no":
 		return false
 	}
-	return true
+	return f.IsReadable()
 }
 
 func (f crudField) IsNullable() bool {
@@ -430,6 +426,14 @@ func (f crudField) isEnum() bool {
 
 func (f crudField) getEnumValues() []EnumValue {
 	return f.Parent.Parent.Enums[f.GoRawType()].Values()
+}
+
+func (f crudField) TableTag() string {
+	tbl := getExtension(f.Def, "table", "")
+	if tbl != "" {
+		return fmt.Sprintf(` table:"%s"`, tbl)
+	}
+	return ""
 }
 
 func (f crudField) getEnumType() string {

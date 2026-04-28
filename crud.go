@@ -12,8 +12,9 @@ import (
 const GROUP_ALL = "all"
 
 type Value struct {
-	Col string
-	Val any
+	Table string
+	Col   string
+	Val   any
 }
 
 func JsonValues(h any, f ValueFilter) []Value {
@@ -55,7 +56,8 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 			continue
 		}
 		v := Value{
-			Col: col,
+			Col:   col,
+			Table: fld.Tag.Get("table"),
 		}
 		refval := ref.Field(i)
 		if !(refval.Kind() == reflect.Ptr && refval.IsNil()) {
@@ -165,7 +167,7 @@ func getGormTag(tag string, target string) (string, bool) {
 
 // FieldToColumn maps a JSON field name to its corresponding database column name
 // using reflection to read the gorm:"column:xxx" tag from the provided struct.
-func FieldToColumn[T any](jsonField string) (string, error) {
+func FieldToColumn[T any](jsonField string) (string, string, error) {
 	var instance T
 	t := reflect.TypeOf(instance)
 	jsonFieldLc := strings.ToLower(jsonField)
@@ -185,19 +187,20 @@ func FieldToColumn[T any](jsonField string) (string, error) {
 			// Found matching field, now extract the column name from gorm tag
 			gormTag := field.Tag.Get("gorm")
 			if gormTag == "" {
-				return "", fmt.Errorf("field %s has no gorm tag", jsonField)
+				return "", "", fmt.Errorf("field %s has no gorm tag", jsonField)
 			}
 
 			// Parse gorm tag to find column name using getGormTag helper
 			columnName, exists := getGormTag(gormTag, "column")
 			if !exists {
-				return "", fmt.Errorf("field %s has no column in gorm tag", jsonField)
+				return "", "", fmt.Errorf("field %s has no column in gorm tag", jsonField)
 			}
-			return columnName, nil
+			table := field.Tag.Get("table")
+			return columnName, table, nil
 		}
 	}
 
-	return "", fmt.Errorf("unknown field: %s", jsonField)
+	return "", "", fmt.Errorf("unknown field: %s", jsonField)
 }
 
 // SetValues takes a list of values likely obtained from Values() and sets the corresponding
