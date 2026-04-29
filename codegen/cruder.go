@@ -157,7 +157,10 @@ func (f crudField) GormTags() string {
 		tags = append(tags, "default:"+*f.DefaultValue())
 	}
 	if hasExtention(f.Def, "table") {
-		tags = append(tags, "->:false")
+		// advanced gorm tag to mark as read only. this is different than
+		// read-only from users perspective where we write it to db, just user
+		// cannot control the value.
+		tags = append(tags, "->")
 	}
 	return strings.Join(tags, ";")
 }
