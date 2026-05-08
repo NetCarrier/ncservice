@@ -63,7 +63,7 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 		if !(refval.Kind() == reflect.Ptr && refval.IsNil()) {
 			v.Val = refval.Interface()
 		}
-		values = AppendFiltered(values, v, fld, f)
+		values = appendFiltered(values, v, fld, f)
 	}
 	return values
 }

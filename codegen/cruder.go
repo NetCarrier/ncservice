@@ -143,8 +143,12 @@ func (f crudField) EnumTag() string {
 }
 
 func (f crudField) GormTags() string {
+	c := f.Col()
+	if c == "-" {
+		return c
+	}
 	tags := []string{
-		"column:" + f.Col(),
+		"column:" + c,
 	}
 	if f.IsKey() {
 		tags = append(tags, "primaryKey")
@@ -205,7 +209,7 @@ func (f crudField) Optional(typ string) bool {
 	rt := f.GoRawType()
 	return f.IsNullable() ||
 		typ == "update" ||
-		rt == "bool" || // the premise that bool default to false when not passed in
+		(typ == "create" && rt == "bool") || // the premise that bool default to false when not passed in
 		strings.HasPrefix(rt, "[]") || // arrays are like ptrs
 		f.DefaultValue() != nil
 }
@@ -491,7 +495,12 @@ func (f crudField) SearchType() string {
 }
 
 func (f crudField) GoTypePtr() string {
-	return "*" + f.GoRawType()
+	raw := f.GoRawType()
+	if strings.HasPrefix(raw, "[]") {
+		// arrays are already like pointers, so we don't need to add another level of indirection
+		return raw
+	}
+	return "*" + raw
 }
 
 func (f crudField) GoRawType() string {

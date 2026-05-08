@@ -30,7 +30,19 @@ func FilterNot(f ValueFilter) ValueFilter {
 }
 
 func FilterNotNil(param Value, fld reflect.StructField) bool {
-	return param.Val != nil
+	return !FilterNil(param, fld)
+}
+
+func FilterNil(param Value, fld reflect.StructField) bool {
+	if param.Val == nil {
+		return true
+	}
+	if fld.Type.Kind() == reflect.Slice {
+		if reflect.ValueOf(param.Val).Len() == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // FilterNotEqual is like a diff useful to tell the difference of an object for before and after
@@ -121,7 +133,7 @@ func filterKeys(x any, isKey bool) ValueFilter {
 	}
 }
 
-func AppendFiltered(args []Value, p Value, fld reflect.StructField, f ValueFilter) []Value {
+func appendFiltered(args []Value, p Value, fld reflect.StructField, f ValueFilter) []Value {
 	if f == nil || f(p, fld) {
 		return append(args, p)
 	}

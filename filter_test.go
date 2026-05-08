@@ -9,37 +9,37 @@ import (
 )
 
 func TestFilter(t *testing.T) {
-	val1 := Value{Col: "col1", Val: "value1"}
-	val2 := Value{Col: "col2", Val: nil}
-	val3 := Value{Col: "col3", Val: 42}
-
-	var fld reflect.StructField
+	s := struct {
+		Field1 string `gorm:"column:col1"`
+		Field2 *int   `gorm:"column:col2"`
+		Field3 int    `gorm:"column:col3"`
+		Field4 []int  `gorm:"column:col4"`
+	}{
+		Field1: "value1",
+		Field2: nil,
+		Field3: 42,
+		Field4: []int{},
+	}
 
 	t.Run("FilterAll", func(t *testing.T) {
-		assert.True(t, FilterAll(val1, fld))
-		assert.True(t, FilterAll(val2, fld))
+		vals := Values(s, FilterAll)
+		assert.Len(t, vals, 4)
 	})
 
 	t.Run("FilterNotNil", func(t *testing.T) {
-		assert.True(t, FilterNotNil(val1, fld))
-		assert.False(t, FilterNotNil(val2, fld))
+		vals := Values(s, FilterNotNil)
+		assert.Len(t, vals, 2)
+		assert.Equal(t, "col1", vals[0].Col)
+		assert.Equal(t, "col3", vals[1].Col)
 	})
 
 	t.Run("FilterAnd", func(t *testing.T) {
 		andFilter := FilterAnd(FilterNotNil, func(v Value, fld reflect.StructField) bool {
 			return v.Col != "col3"
 		})
-		assert.True(t, andFilter(val1, fld))
-		assert.False(t, andFilter(val2, fld))
-		assert.False(t, andFilter(val3, fld))
-	})
-
-	t.Run("AppendFiltered", func(t *testing.T) {
-		args := []Value{}
-		args = AppendFiltered(args, val1, fld, FilterNotNil)
-		assert.Len(t, args, 1)
-		args = AppendFiltered(args, val2, fld, FilterNotNil)
-		assert.Len(t, args, 1) // val2 should not be added
+		vals := Values(s, andFilter)
+		assert.Len(t, vals, 1)
+		assert.Equal(t, "col1", vals[0].Col)
 	})
 }
 
