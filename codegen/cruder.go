@@ -39,9 +39,10 @@ type CrudOptions struct {
 }
 
 type CrudOptionsEntry struct {
-	Table    string
-	Ydef     string
-	Criteria []string
+	Table       string
+	Ydef        string
+	EmbedStruct string
+	Criteria    []string
 }
 
 type crudItem struct {
@@ -153,14 +154,24 @@ func (f crudField) GormTags() string {
 	if f.IsKey() {
 		tags = append(tags, "primaryKey")
 	}
-	custom := getExtension(f.Def, "serializer", "")
-	if custom != "" {
-		tags = append(tags, "serializer:"+custom)
+	ser := getExtension(f.Def, "serializer", "")
+	if ser != "" {
+		tags = append(tags, "serializer:"+ser)
 	}
 	if f.DefaultValue() != nil {
 		tags = append(tags, "default:"+*f.DefaultValue())
 	}
-	if hasExtention(f.Def, "table") {
+	scope := getExtension(f.Def, "dbscope", "")
+	if scope != "" {
+		switch scope {
+		case "readonly":
+			tags = append(tags, "<-")
+		case "writeonly":
+			tags = append(tags, "->")
+		case "ignore":
+			tags = append(tags, "-")
+		}
+	} else if hasExtention(f.Def, "table") {
 		// advanced gorm tag to mark as read only. this is different than
 		// read-only from users perspective where we write it to db, just user
 		// cannot control the value.
@@ -210,7 +221,8 @@ func (f crudField) Optional(typ string) bool {
 	return f.IsNullable() ||
 		typ == "update" ||
 		(typ == "create" && rt == "bool") || // the premise that bool default to false when not passed in
-		strings.HasPrefix(rt, "[]") || // arrays are like ptrs
+		strings.HasPrefix(rt, "[]") ||
+		strings.HasPrefix(rt, "*") || // arrays are like ptrs
 		f.DefaultValue() != nil
 }
 
@@ -239,6 +251,10 @@ func (f crudField) getEnumValuesAsStrings() []string {
 		}
 	}
 	return values
+}
+
+func (v crudItem) EmbedStruct() string {
+	return v.opts.EmbedStruct
 }
 
 func (v crudItem) Fields(crit ...string) []crudField {
@@ -483,7 +499,7 @@ func (f crudField) SearchType() string {
 	override := getExtension(f.Def, "searchopts", "")
 	if override != "none" {
 		switch ptrType {
-		case "*string":
+		case "*string", "[]string":
 			return "*database.StringField"
 		case "*int", "*int64", "*uint", "*uint64", "*float64":
 			return "*database.NumberField[" + f.GoRawType() + "]"
@@ -496,7 +512,7 @@ func (f crudField) SearchType() string {
 
 func (f crudField) GoTypePtr() string {
 	raw := f.GoRawType()
-	if strings.HasPrefix(raw, "[]") {
+	if strings.HasPrefix(raw, "[]") || strings.HasPrefix(raw, "*") {
 		// arrays are already like pointers, so we don't need to add another level of indirection
 		return raw
 	}
