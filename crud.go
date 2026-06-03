@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-
-	"gorm.io/gorm"
-	"gorm.io/gorm/schema"
 )
 
 const GROUP_ALL = "all"
@@ -70,9 +67,8 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 
 func GetPrimaryKeyColumn(h any) []string {
 	var cols []string
-	ForEachGorm(reflect.ValueOf(h).Elem(), func(fld reflect.StructField, tag string) bool {
+	ForEachGorm(reflect.ValueOf(h).Elem(), func(fld reflect.StructField, tag string, col string) bool {
 		if _, exists := getGormTag(tag, "primaryKey"); exists {
-			col, _ := getGormTag(tag, "column")
 			cols = append(cols, col)
 		}
 		return true
@@ -80,15 +76,16 @@ func GetPrimaryKeyColumn(h any) []string {
 	return cols
 }
 
-func ForEachGorm(ref reflect.Value, fn func(fld reflect.StructField, tag string) bool) {
+func ForEachGorm(ref reflect.Value, fn func(fld reflect.StructField, tag string, col string) bool) {
 	t := ref.Type()
 	for i := 0; i < ref.NumField(); i++ {
 		fld := t.Field(i)
-		col, exists := getGormTag(fld.Tag.Get("gorm"), "column")
+		tag := fld.Tag.Get("gorm")
+		col, exists := getGormTag(tag, "column")
 		if !exists {
 			continue
 		}
-		if !fn(fld, col) {
+		if !fn(fld, tag, col) {
 			break
 		}
 	}
@@ -111,45 +108,6 @@ func ForEachTag(h any, tagId string, fn func(f reflect.StructField, v reflect.Va
 			break
 		}
 	}
-}
-
-func ResolveForeignKeys(db *gorm.DB, x schema.Tabler) error {
-	var err error
-	ForEachTag(x, "fk", func(fld reflect.StructField, raw reflect.Value, tag string) bool {
-		v := raw
-		// handle pointers to foreign keys as optional FKs: if they exist, they must be valid
-		if raw.Kind() == reflect.Ptr {
-			if raw.IsNil() {
-				return true
-			}
-			v = raw.Elem()
-		}
-		parts := strings.Split(tag, ".")
-		if len(parts) != 2 {
-			panic("invalid fk tag format " + tag)
-		}
-		targetTable := parts[0]
-		targetCol := parts[1]
-		id := v.Interface()
-		if err = ValidateForeignKey(db, targetTable, targetCol, id); err != nil {
-			return false
-		}
-		return true
-	})
-	return err
-}
-
-func ValidateForeignKey(db *gorm.DB, targetTable string, targetCol string, id any) error {
-	var exists bool
-	sql := fmt.Sprintf("select exists(select 1 from %s where %s = ?)", targetTable, targetCol)
-	err := db.Raw(sql, id).Scan(&exists).Error
-	if err != nil {
-		return fmt.Errorf("erorr checking foreign key. %w", err)
-	}
-	if !exists {
-		return fmt.Errorf("foreign key constraint failed: %s.%s=%v does not exist", targetTable, targetCol, id)
-	}
-	return nil
 }
 
 func getGormTag(tag string, target string) (string, bool) {
