@@ -3,6 +3,7 @@ package ncservice
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,12 +23,14 @@ func TestFilter(t *testing.T) {
 	}
 
 	t.Run("FilterAll", func(t *testing.T) {
-		vals := Values(s, FilterAll)
+		vals, err := Values(s, FilterAll)
+		assert.NoError(t, err)
 		assert.Len(t, vals, 4)
 	})
 
 	t.Run("FilterNotNil", func(t *testing.T) {
-		vals := Values(s, FilterNotNil)
+		vals, err := Values(s, FilterNotNil)
+		assert.NoError(t, err)
 		assert.Len(t, vals, 2)
 		assert.Equal(t, "col1", vals[0].Col)
 		assert.Equal(t, "col3", vals[1].Col)
@@ -37,7 +40,8 @@ func TestFilter(t *testing.T) {
 		andFilter := FilterAnd(FilterNotNil, func(v Value, fld reflect.StructField) bool {
 			return v.Col != "col3"
 		})
-		vals := Values(s, andFilter)
+		vals, err := Values(s, andFilter)
+		assert.NoError(t, err)
 		assert.Len(t, vals, 1)
 		assert.Equal(t, "col1", vals[0].Col)
 	})
@@ -64,4 +68,39 @@ func TestDiffVal(t *testing.T) {
 	diff = DiffVals([]Value{a1, a2, a3, a4}, []Value{b1, b2, b3, b5})
 	assert.Equal(t, 4, len(diff), diff)
 	assert.Equal(t, `[{col2 <nil> value2} {col3 42 <nil>} {col4 99.9 <nil>} {col5 <nil> 99.9}]`, fmt.Sprintf("%v", diff))
+}
+
+func TestHidePasswords(t *testing.T) {
+	x := struct {
+		Str    string  `json:"str" xyz:"" password:"true"`
+		StrPtr *string `json:"strPtr" xyz:"" password:"true"`
+		Num    int64   `json:"num" password:"true"`
+		Normal string  `json:"norm"`
+	}{}
+	refStruct := reflect.TypeOf(x)
+
+	strFld := refStruct.Field(0)
+	actual1, err := HidePasswords("abc123", strFld)
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(actual1.(string), "[redacted"), actual1)
+
+	actual2, err := HidePasswords("abc123", strFld)
+	assert.NoError(t, err)
+	assert.Equal(t, actual1, actual2)
+
+	strPtrFld := refStruct.Field(1)
+	pwd := "zzz!!!"
+	actual, err := HidePasswords(&pwd, strPtrFld)
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(actual.(string), "[redacted"), actual)
+
+	numFld := refStruct.Field(2)
+	actual, err = HidePasswords(99, numFld)
+	assert.NoError(t, err)
+	assert.True(t, strings.HasPrefix(actual.(string), "[redacted"), actual)
+
+	normFld := refStruct.Field(3)
+	actual, err = HidePasswords("leave me alone", normFld)
+	assert.NoError(t, err)
+	assert.Equal(t, "leave me alone", actual)
 }

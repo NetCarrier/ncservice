@@ -214,9 +214,10 @@ func TestValues(t *testing.T) {
 		FavColor: &red,
 	}
 
-	values := Values(ts, func(v Value, _ reflect.StructField) bool {
+	values, err := Values(ts, func(v Value, _ reflect.StructField) bool {
 		return v.Col != "age" // Filter out age
 	})
+	assert.NoError(t, err)
 
 	assert.Equal(t, 4, len(values))
 
@@ -226,7 +227,8 @@ func TestValues(t *testing.T) {
 	assert.EqualValues(t, &red, values[2].Val)
 	assert.EqualValues(t, nil, values[3].Val)
 
-	all := Values(&ts, nil)
+	all, err := Values(&ts, nil)
+	assert.NoError(t, err)
 	assert.Equal(t, 5, len(all))
 }
 

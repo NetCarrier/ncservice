@@ -1,11 +1,15 @@
 package ncservice
 
 import (
+	"fmt"
+	"hash/crc32"
 	"reflect"
 	"slices"
 )
 
 type ValueFilter func(Value, reflect.StructField) bool
+
+type ValueReader func(any, reflect.StructField) (any, error)
 
 func FilterAll(param Value, fld reflect.StructField) bool {
 	return true
@@ -138,4 +142,18 @@ func appendFiltered(args []Value, p Value, fld reflect.StructField, f ValueFilte
 		return append(args, p)
 	}
 	return args
+}
+
+var passwordScrambler = crc32.MakeTable(0xfafa983d) // any quasi-random val
+
+func HidePasswords(v any, fld reflect.StructField) (any, error) {
+	if fld.Tag.Get("password") != "" {
+		// here we hash the password to a useless, but predictable value that will hide
+		// what the password is, but return a value that will be different on different
+		// values should caller want to know if a password has changed
+		orig := fmt.Sprintf("%v", v)
+		scrambled := crc32.Checksum([]byte(orig), passwordScrambler)
+		return fmt.Sprintf("[redacted %v]", scrambled), nil
+	}
+	return v, nil
 }

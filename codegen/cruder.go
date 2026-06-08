@@ -171,7 +171,7 @@ func (f crudField) GormTags() string {
 		case "ignore":
 			tags = append(tags, "-")
 		}
-	} else if hasExtention(f.Def, "table") {
+	} else if hasExtension(f.Def, "table") {
 		// advanced gorm tag to mark as read only. this is different than
 		// read-only from users perspective where we write it to db, just user
 		// cannot control the value.
@@ -198,16 +198,23 @@ func (f crudField) JsonSchemaTag() string {
 	return desc
 }
 
-func (f crudField) ShowTag() string {
-	if hasExtention(f.Def, "showFull") {
-		return ` show:"full"`
+func (f crudField) JsonTags(typ string) string {
+	// check if valid under context, otherwise empty
+	if typ == "read" && !f.IsReadable() {
+		return "-"
 	}
-	return ""
+
+	tags := strcase.LowerCamelCase(f.Name())
+	if f.Optional(typ) {
+		return tags + ",omitempty"
+	}
+
+	return tags
 }
 
-func (f crudField) JsonBindings(typ string) string {
-	if f.Optional(typ) {
-		return ",omitempty"
+func (f crudField) ShowTag() string {
+	if hasExtension(f.Def, "showFull") {
+		return ` show:"full"`
 	}
 	return ""
 }
@@ -395,7 +402,7 @@ func getExtension(def meta.HasExtensions, extName string, defaultValue string) s
 	return defaultValue
 }
 
-func hasExtention(def meta.Definition, extName string) bool {
+func hasExtension(def meta.Definition, extName string) bool {
 	return meta.FindExtension(extName, def.Extensions()) != nil
 }
 
@@ -404,7 +411,7 @@ func (f crudField) scopes() []string {
 }
 
 func (f crudField) hasCustomScopes() bool {
-	return hasExtention(f.Def, "scopes")
+	return hasExtension(f.Def, "scopes")
 }
 
 func (f crudField) IsUpdateable() bool {
@@ -420,6 +427,9 @@ func (f crudField) IsCreateable() bool {
 }
 
 func (f crudField) IsReadable() bool {
+	if !f.hasCustomScopes() && f.IsPassword() {
+		return false
+	}
 	return slices.Contains(f.scopes(), "read")
 }
 
@@ -432,7 +442,7 @@ func (f crudField) IsSearchable() bool {
 }
 
 func (f crudField) IsNullable() bool {
-	return hasExtention(f.Def, "nullable")
+	return hasExtension(f.Def, "nullable")
 }
 
 func (f crudField) GoType() string {
@@ -455,6 +465,17 @@ func (f crudField) TableTag() string {
 	tbl := getExtension(f.Def, "table", "")
 	if tbl != "" {
 		return fmt.Sprintf(` table:"%s"`, tbl)
+	}
+	return ""
+}
+
+func (f crudField) IsPassword() bool {
+	return hasExtension(f.Def, "password")
+}
+
+func (f crudField) PasswordTag() string {
+	if f.IsPassword() {
+		return (` password:"true"`)
 	}
 	return ""
 }

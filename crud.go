@@ -14,20 +14,36 @@ type Value struct {
 	Val   any
 }
 
-func JsonValues(h any, f ValueFilter) []Value {
-	return values(h, f, jsonColMapper)
+func ApiValues(h any, f ValueFilter) ([]Value, error) {
+	return ReadValues(h,
+		ReadValueOptions{
+			Filter:       f,
+			ColumnMapper: ApiColumns,
+		},
+	)
 }
 
 // Read all fields in a given struct ready for DB i/o
-func Values(h any, f ValueFilter) []Value {
-	return values(h, f, dbColMapper)
+func Values(h any, f ValueFilter) ([]Value, error) {
+	return ReadValues(h,
+		ReadValueOptions{
+			Filter:       f,
+			ColumnMapper: DatabaseColumns,
+		},
+	)
 }
 
-func dbColMapper(fld reflect.StructField) (string, bool) {
+func DatabaseColumns(fld reflect.StructField) (string, bool) {
 	return getGormTag(fld.Tag.Get("gorm"), "column")
 }
 
-func jsonColMapper(fld reflect.StructField) (string, bool) {
+type ReadValueOptions struct {
+	Filter       ValueFilter
+	ColumnMapper ColumnMapper
+	Reader       ValueReader
+}
+
+func ApiColumns(fld reflect.StructField) (string, bool) {
 	name := fld.Tag.Get("json")
 	if name == "" || name == "-" {
 		return "", false
@@ -36,9 +52,11 @@ func jsonColMapper(fld reflect.StructField) (string, bool) {
 	return segs[0], true
 }
 
-type colMapper func(fld reflect.StructField) (string, bool)
+type ColumnMapper func(fld reflect.StructField) (string, bool)
 
-func values(h any, f ValueFilter, getCol colMapper) []Value {
+// f ValueFilter, getCol ColumnMapper
+func ReadValues(h any, opts ReadValueOptions) ([]Value, error) {
+	var err error
 	ref := reflect.ValueOf(h)
 	if ref.Kind() == reflect.Ptr {
 		ref = ref.Elem()
@@ -48,7 +66,7 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 	var values []Value
 	for i := range n {
 		fld := t.Field(i)
-		col, exists := getCol(fld)
+		col, exists := opts.ColumnMapper(fld)
 		if !exists {
 			continue
 		}
@@ -58,11 +76,18 @@ func values(h any, f ValueFilter, getCol colMapper) []Value {
 		}
 		refval := ref.Field(i)
 		if !(refval.Kind() == reflect.Ptr && refval.IsNil()) {
-			v.Val = refval.Interface()
+			val := refval.Interface()
+			if opts.Reader != nil {
+				if v.Val, err = opts.Reader(val, fld); err != nil {
+					return nil, err
+				}
+			} else {
+				v.Val = val
+			}
 		}
-		values = appendFiltered(values, v, fld, f)
+		values = appendFiltered(values, v, fld, opts.Filter)
 	}
-	return values
+	return values, nil
 }
 
 func GetPrimaryKeyColumn(h any) []string {
@@ -163,16 +188,16 @@ func FieldToColumn[T any](jsonField string) (string, string, error) {
 
 // SetValues takes a list of values likely obtained from Values() and sets the corresponding
 func SetValues(h any, values []Value) error {
-	return setValues(h, values, dbColMapper)
+	return setValues(h, values, DatabaseColumns)
 }
 
 // SetJsonValues takes a list of values likely obtained from JsonValues() and sets the corresponding
 func SetJsonValues(h any, values []Value) error {
-	return setValues(h, values, jsonColMapper)
+	return setValues(h, values, ApiColumns)
 }
 
 // setValues takes a list of values likely obtained from Values() and sets the corresponding
-func setValues(h any, values []Value, getCol colMapper) error {
+func setValues(h any, values []Value, getCol ColumnMapper) error {
 	ref := reflect.ValueOf(h).Elem()
 	t := ref.Type()
 	for i := 0; i < ref.NumField(); i++ {
