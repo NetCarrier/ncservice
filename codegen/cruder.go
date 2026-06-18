@@ -320,9 +320,11 @@ func describeRegex(s string) (string, bool) {
 		return "any full or partial phone number like +0441234567, 123-4567 or 1234567", true
 	case `(\(?\d{1,4}\)?[\s.-]?)?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{1,7}`:
 		return "a full phone number with some formatting flexiblity like '1 (417) 232-2314' or '2342341342'", true
+	case `[^']*`:
+		return "no single quotes", true
 	}
 	if strings.ContainsAny(s, `\"'`) {
-		slog.Error("cannot place regex in docs so consider updating describeRegex to swap it with human equivalent", "regex", s)
+		slog.Error("cannot place regex in docs so consider updating ncservice/codegen/cruder.go:describeRegex to swap it with human equivalent", "regex", s)
 		return "", false
 	}
 	return s, true

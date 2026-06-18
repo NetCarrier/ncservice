@@ -201,9 +201,10 @@ func TestValues(t *testing.T) {
 		ID       int    `gorm:"column:id"`
 		Name     string `gorm:"column:name"`
 		Ignore   string
-		Age      int     `gorm:"column:age"`
-		FavColor *string `gorm:"column:color"`
-		FavSport *string `gorm:"column:sport"`
+		Age      int      `gorm:"column:age"`
+		FavColor *string  `gorm:"column:color"`
+		FavSport *string  `gorm:"column:sport"`
+		Teachers []string `gorm:"column:teachers"`
 	}
 	var red = "red"
 	ts := testStruct{
@@ -219,17 +220,18 @@ func TestValues(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, 4, len(values))
+	assert.Equal(t, 5, len(values))
 
 	assert.Equal(t, "id", values[0].Col)
 	assert.EqualValues(t, 1, values[0].Val)
 	assert.EqualValues(t, "Alice", values[1].Val)
 	assert.EqualValues(t, &red, values[2].Val)
 	assert.EqualValues(t, nil, values[3].Val)
+	assert.EqualValues(t, []string(nil), values[4].Val)
 
 	all, err := Values(&ts, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 5, len(all))
+	assert.Equal(t, 6, len(all))
 }
 
 func TestSetValues(t *testing.T) {
@@ -238,9 +240,10 @@ func TestSetValues(t *testing.T) {
 		ID       int    `gorm:"column:id"`
 		Name     string `gorm:"column:name"`
 		Ignore   string
-		Age      int     `gorm:"column:age"`
-		FavColor *string `gorm:"column:color"`
-		FavSport *string `gorm:"column:sport"`
+		Age      int      `gorm:"column:age"`
+		FavColor *string  `gorm:"column:color"`
+		FavSport *string  `gorm:"column:sport"`
+		Strs     []string `gorm:"column:strs"`
 	}
 	var red = "red"
 	var bob = "Bob"
@@ -252,9 +255,12 @@ func TestSetValues(t *testing.T) {
 		{Col: "ignore", Val: "bingo"},
 		{Col: "color", Val: &red},
 		{Col: "sport", Val: "soccer"},
+		{Col: "strs"}, // testing we *don't set* anything here
 	}
 
-	var ts2 testStruct
+	ts2 := testStruct{
+		Strs: []string{"a", "b"},
+	}
 	SetValues(&ts2, valuesToSet)
 
 	assert.Equal(t, 2, ts2.ID)
@@ -264,4 +270,5 @@ func TestSetValues(t *testing.T) {
 	assert.NotNil(t, ts2.FavSport)
 	assert.Equal(t, "soccer", *ts2.FavSport)
 	assert.EqualValues(t, "", ts2.Ignore)
+	assert.EqualValues(t, []string{"a", "b"}, ts2.Strs)
 }
