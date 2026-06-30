@@ -449,7 +449,7 @@ func (f crudField) IsNullable() bool {
 
 func (f crudField) GoType() string {
 	t := f.GoRawType()
-	if f.IsNullable() {
+	if f.IsNullable() && !f.Def.Type().Format().IsList() {
 		t = "*" + t
 	}
 	return t
@@ -559,7 +559,7 @@ func (f crudField) GoRawType() string {
 			goType = "time.Time"
 		case "boolean":
 			goType = "bool"
-		case "string":
+		case "string", "email":
 			goType = "string"
 		case "decimal64":
 			goType = "float64"
