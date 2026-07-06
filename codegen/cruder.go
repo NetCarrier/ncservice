@@ -220,6 +220,10 @@ func (f crudField) ShowTag() string {
 }
 
 func (f crudField) Optional(typ string) bool {
+	if typ == "search" {
+		// criteria, everything should be optional
+		return true
+	}
 	// for key is not automatically generated, we must include it in the creation process
 	if typ == "create" && f.IsKey() {
 		return false
@@ -521,6 +525,9 @@ func (f crudField) SearchType() string {
 	ptrType := f.GoTypePtr()
 	override := getExtension(f.Def, "searchopts", "")
 	if override != "none" {
+		if override == "id" {
+			return "*database.IdField[" + f.GoRawType() + "]"
+		}
 		switch ptrType {
 		case "*string", "[]string":
 			return "*database.StringField"
