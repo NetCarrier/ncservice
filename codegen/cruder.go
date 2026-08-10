@@ -212,6 +212,29 @@ func (f crudField) JsonTags(typ string) string {
 	return tags
 }
 
+func (f crudField) BsonTags(typ string) string {
+	// check if valid under context, otherwise empty
+	if typ == "read" && !f.IsReadable() {
+		return "-"
+	}
+
+	tags := strcase.LowerCamelCase(f.Name())
+	if hasExtension(f.Def, "col") {
+		// pre-existing Mongo collections (e.g. ones that started life alongside a
+		// legacy SQL schema) commonly use the same non-camelCase document keys as
+		// their x:col-mapped SQL column, which can differ arbitrarily from the
+		// field's own name (not just casing) - respect that override here too,
+		// same as GormTags() does via Col(), rather than assuming bson key ==
+		// json key the way a Mongo-native-from-day-one collection would.
+		tags = getExtension(f.Def, "col", tags)
+	}
+	if f.Optional(typ) {
+		return tags + ",omitempty"
+	}
+
+	return tags
+}
+
 func (f crudField) ShowTag() string {
 	if hasExtension(f.Def, "showFull") {
 		return ` show:"full"`
@@ -592,6 +615,14 @@ func (f crudField) ForeignKeyTag() string {
 
 func (v crudItem) Table() string {
 	return getExtension(v.Def, "table", strcase.UpperCamelCase(v.Def.Ident()))
+}
+
+func (v crudItem) HasCollection() bool {
+	return hasExtension(v.Def, "collection")
+}
+
+func (v crudItem) Collection() string {
+	return getExtension(v.Def, "collection", "")
 }
 
 func (v crudItem) Struct() string {
