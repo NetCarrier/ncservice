@@ -139,3 +139,61 @@ func TestBsonTagsAndCollection(t *testing.T) {
 	assert.True(t, c.Entries[1].HasCollection())
 	assert.Equal(t, "mycoll", c.Entries[1].Collection())
 }
+
+// TestEmbedTagsSkipCriteriaAndApiHidden covers the three helpers added for the
+// fax-style embed pattern: a Mongo-backed entry with a skipped Criteria struct
+// and a JSON-hidden field, alongside a plain table-backed entry for contrast.
+func TestEmbedTagsSkipCriteriaAndApiHidden(t *testing.T) {
+	mstr := `module x {
+		prefix "x";
+
+		extension collection {
+			argument "name";
+		}
+		extension scopes {
+			argument "value";
+		}
+		extension apiHidden {
+			description "excluded from JSON but not from bson/gorm";
+		}
+
+		list withCollection {
+			x:collection "mycoll";
+			leaf id {
+				type string;
+			}
+			leaf hidden {
+				type string;
+				x:scopes "create,read,update";
+				x:apiHidden;
+			}
+		}
+		list withoutCollection {
+			leaf id {
+				type string;
+			}
+		}
+	}
+	`
+	m, err := parser.LoadModuleFromString(nil, mstr)
+	require.NoError(t, err)
+	opts := CrudOptions{
+		Entries: []CrudOptionsEntry{
+			{Table: "withCollection", Ydef: "withCollection", EmbedStruct: "computedFields", Criteria: []string{"none"}},
+			{Table: "withoutCollection", Ydef: "withoutCollection"},
+		},
+	}
+	c := NewCruder(opts)
+	require.NoError(t, c.read(m))
+
+	assert.Equal(t, `bson:",inline"`, c.Entries[0].EmbedTags(), "Mongo-backed models need bson inline to flatten the embed")
+	assert.Equal(t, "", c.Entries[1].EmbedTags(), "GORM already flattens anonymous embeds without a tag")
+
+	assert.True(t, c.Entries[0].SkipCriteria(), `criteria: ["none"] opts out of the generated Criteria struct`)
+	assert.False(t, c.Entries[1].SkipCriteria(), "no criteria configured at all should not skip")
+
+	hidden := c.Entries[0].fields[1]
+	assert.True(t, hidden.IsApiHidden())
+	assert.Equal(t, "-", hidden.JsonTags("read"), "apiHidden must suppress the read JSON tag")
+	assert.Equal(t, "-", hidden.JsonTags("create"), "apiHidden suppresses JSON in every scope, not just read, even though this field is otherwise createable")
+}
