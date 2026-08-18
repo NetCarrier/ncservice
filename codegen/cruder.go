@@ -203,6 +203,9 @@ func (f crudField) JsonTags(typ string) string {
 	if typ == "read" && !f.IsReadable() {
 		return "-"
 	}
+	if f.IsApiHidden() {
+		return "-"
+	}
 
 	tags := strcase.LowerCamelCase(f.Name())
 	if f.Optional(typ) {
@@ -291,6 +294,18 @@ func (v crudItem) EmbedStruct() string {
 	return v.opts.EmbedStruct
 }
 
+// EmbedTags returns the struct tag to apply to the EmbedStruct field, if any.
+// Mongo-backed models need bson:",inline" on the embed - unlike encoding/json, the
+// mongo driver nests an anonymous struct field under its own key by default, so
+// inline is required to flatten it into the parent document. SQL-backed models
+// need no tag since GORM already flattens anonymous embeds without one.
+func (v crudItem) EmbedTags() string {
+	if v.HasCollection() {
+		return `bson:",inline"`
+	}
+	return ""
+}
+
 func (v crudItem) Fields(crit ...string) []crudField {
 	var out []crudField
 	for _, f := range v.fields {
@@ -329,6 +344,15 @@ func (v crudItem) HasLastModified() bool {
 
 func (f crudItem) HasCriteria(crit string) bool {
 	return slices.Contains(f.opts.Criteria, crit)
+}
+
+// SkipCriteria opts an entry out of auto-generated Criteria via criteria: ["none"]
+// in models.json - for entries whose filtering needs backend-specific logic (e.g. a
+// field stored as a string in Mongo but exposed as an int in the API) that a
+// generic per-field Criteria struct can't express, so a hand-written one is used
+// instead and must not collide with the generated name.
+func (f crudItem) SkipCriteria() bool {
+	return slices.Contains(f.opts.Criteria, "none")
 }
 
 type crudField struct {
@@ -500,6 +524,16 @@ func (f crudField) TableTag() string {
 
 func (f crudField) IsPassword() bool {
 	return hasExtension(f.Def, "password")
+}
+
+// IsApiHidden reports whether the field should be excluded from JSON API output
+// while still being readable everywhere else (bson, gorm, etc). Unlike password
+// (which hides a field from every format via IsReadable), this only suppresses
+// the JSON tag - for fields whose storage-layer decoding must stay intact (e.g. a
+// Mongo document needs to keep decoding a field) even though it should never be
+// exposed to API consumers directly.
+func (f crudField) IsApiHidden() bool {
+	return hasExtension(f.Def, "apiHidden")
 }
 
 func (f crudField) PasswordTag() string {
