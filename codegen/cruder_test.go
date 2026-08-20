@@ -68,6 +68,15 @@ func TestCrudItem(t *testing.T) {
 	assert.Equal(t, "[]string", f.GoType())
 }
 
+func TestDescribeRegex(t *testing.T) {
+	s, ok := describeRegex(`(((\+[0-9]{3})|0)?[0-9]{3}[-]?[0-9]{4})|([0-9]{10})`)
+	assert.True(t, ok, "phone number pattern combining the 10-digit and partial/country-code forms should have a human description")
+	assert.NotEmpty(t, s)
+
+	_, ok = describeRegex(`^unmapped\d+pattern$`)
+	assert.False(t, ok, "an unmapped pattern containing a backslash should fall back to not-describable")
+}
+
 func TestBsonTagsAndCollection(t *testing.T) {
 	mstr := `module x {
 		prefix "x";
