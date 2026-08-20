@@ -369,6 +369,8 @@ func describeRegex(s string) (string, bool) {
 		return "any email address", true
 	case `((\+[0-9]{3})|0)?[0-9]{3}[-]?[0-9]{4}`:
 		return "any full or partial phone number like +0441234567, 123-4567 or 1234567", true
+	case `(((\+[0-9]{3})|0)?[0-9]{3}[-]?[0-9]{4})|([0-9]{10})`:
+		return "a 10-digit phone number like 5551234567, or a full or partial phone number like +0441234567, 123-4567 or 1234567", true
 	case `(\(?\d{1,4}\)?[\s.-]?)?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{1,7}`:
 		return "a full phone number with some formatting flexiblity like '1 (417) 232-2314' or '2342341342'", true
 	case `[^']*`:
