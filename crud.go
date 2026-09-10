@@ -12,6 +12,15 @@ type Value struct {
 	Table string
 	Col   string
 	Val   any
+	Array bool
+}
+
+// IsArray reports whether this value's database column packs multiple values into a
+// single delimited column (e.g. a leaf-list stored via a CSV-style serializer), as
+// opposed to a plain scalar column. Callers building search predicates can use this to
+// pick member-wise matching (e.g. FIND_IN_SET) instead of a plain equality/LIKE match.
+func (v Value) IsArray() bool {
+	return v.Array
 }
 
 func ApiValues(h any, f ValueFilter) ([]Value, error) {
@@ -73,6 +82,7 @@ func ReadValues(h any, opts ReadValueOptions) ([]Value, error) {
 		v := Value{
 			Col:   col,
 			Table: fld.Tag.Get("table"),
+			Array: fld.Tag.Get("array") == "true",
 		}
 		refval := ref.Field(i)
 		if !(refval.Kind() == reflect.Ptr && refval.IsNil()) {

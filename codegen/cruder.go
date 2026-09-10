@@ -524,6 +524,24 @@ func (f crudField) TableTag() string {
 	return ""
 }
 
+// IsArray reports whether this field is a leaf-list packed into a single delimited
+// database column (e.g. via the Csv2String/Csv2Int/Pipe2String serializers), as opposed
+// to a leaf-list backed by a separate join table (x:table). Only the former needs
+// member-wise matching (e.g. FIND_IN_SET) when searched.
+func (f crudField) IsArray() bool {
+	if _, ok := f.Def.(*meta.LeafList); !ok {
+		return false
+	}
+	return getExtension(f.Def, "serializer", "") != ""
+}
+
+func (f crudField) ArrayTag() string {
+	if f.IsArray() {
+		return ` array:"true"`
+	}
+	return ""
+}
+
 func (f crudField) IsPassword() bool {
 	return hasExtension(f.Def, "password")
 }
