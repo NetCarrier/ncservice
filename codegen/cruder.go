@@ -46,10 +46,11 @@ type CrudOptionsEntry struct {
 }
 
 type crudItem struct {
-	opts   CrudOptionsEntry
-	Parent *Cruder
-	Def    *meta.List
-	fields []crudField
+	opts       CrudOptionsEntry
+	Parent     *Cruder
+	Def        *meta.List
+	fields     []crudField
+	containers []crudContainer
 }
 
 func (c *Cruder) Run(opts CrudOptions) error {
@@ -88,15 +89,28 @@ func (c *Cruder) read(m *meta.Module) error {
 		if !valid {
 			return fmt.Errorf("invalid YANG definition: %s", e.Ydef)
 		}
-		for _, f := range entry.Def.DataDefinitions() {
-			f := crudField{
-				Parent: entry,
-				Def:    f.(meta.Leafable),
+		for _, def := range entry.Def.DataDefinitions() {
+			switch d := def.(type) {
+			case meta.Leafable:
+				entry.fields = append(entry.fields, crudField{
+					Parent: entry,
+					Def:    d,
+				})
+			case *meta.Container:
+				cont, err := newCrudContainer(entry, entry.Struct(), d)
+				if err != nil {
+					return err
+				}
+				entry.containers = append(entry.containers, cont)
+			default:
+				return fmt.Errorf("list %q: %q is not supported, only leaf, leaf-list and container", e.Ydef, def.Ident())
 			}
-			entry.fields = append(entry.fields, f)
 		}
 
 		c.Entries = append(c.Entries, entry)
+	}
+	if err := c.checkNestedStructNames(); err != nil {
+		return err
 	}
 
 	c.Index = make(map[string]crudItem, len(c.Entries))
@@ -358,6 +372,7 @@ func (f crudItem) SkipCriteria() bool {
 type crudField struct {
 	Parent crudItem
 	Def    meta.Leafable
+	nested bool // inside a container rather than directly in the list
 }
 
 // describeRegex handles regexs that do not render will in Go's tag descriptions
@@ -412,6 +427,10 @@ func (f crudField) Description() string {
 }
 
 func (f crudField) IsKey() bool {
+	if f.nested {
+		// keys belong to the list itself, a nested leaf sharing a key's name is not one
+		return false
+	}
 	for _, k := range f.Parent.Def.KeyMeta() {
 		if k.Ident() == f.Def.Ident() {
 			return true
